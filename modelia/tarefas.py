@@ -8,8 +8,8 @@ Cada verificação devolve (nota de 0 a 3, lista do que está certo, lista do qu
 A nota segue a rubrica do protocolo experimental: 0 nada, 1 errado, 2 parcial, 3 correto.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 
 def perto(a, b, tol):
@@ -70,7 +70,8 @@ def verificar_cena_com_luz(cena):
     if not malhas and not outros:
         return 0, [], ["A cena está vazia."]
     certo, falta = [], []
-    planos = [m for m in malhas if m["dim"][0] <= 0.01 and perto(m["dim"][1], 4.0, 0.2) and perto(m["dim"][2], 4.0, 0.2)]
+    planos = [m for m in malhas
+              if m["dim"][0] <= 0.01 and perto(m["dim"][1], 4.0, 0.2) and perto(m["dim"][2], 4.0, 0.2)]
     esferas = [m for m in malhas if all(perto(d, 1.0, 0.05) for d in m["dim"])]
     luzes = [o for o in outros if o["tipo"] == "LIGHT" and o["subtipo"] == "POINT"]
     if planos:
@@ -85,7 +86,7 @@ def verificar_cena_com_luz(cena):
     else:
         falta.append("Falta a esfera de raio 0,5 m.")
     esfera = esferas[0] if esferas else None
-    if luzes and esfera and any(l["local"][2] > esfera["z_max"] for l in luzes):
+    if luzes and esfera and any(luz["local"][2] > esfera["z_max"] for luz in luzes):
         certo.append("Luz pontual acima da esfera.")
     elif luzes:
         certo.append("Existe uma luz pontual.")

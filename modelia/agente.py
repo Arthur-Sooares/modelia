@@ -22,6 +22,8 @@ from modelia.tarefas import TAREFAS
 EXPLICAR, DEMONSTRAR, VERIFICAR = "Explicar", "Demonstrar", "Verificar"
 MODOS = [EXPLICAR, DEMONSTRAR, VERIFICAR]
 
+NAO_SEI = "NAO_SEI"  # a LLM responde isto quando o material não cobre a dúvida
+
 BASE = (
     "Você é o Modelia, um tutor de modelagem 3D no Blender 5.1 para estudantes iniciantes. "
     "Responda sempre em português do Brasil, com frases curtas e palavras simples."
@@ -29,8 +31,8 @@ BASE = (
 
 SISTEMA_EXPLICAR = BASE + (
     " Responda à dúvida usando SOMENTE os trechos do material que vêm na mensagem. "
-    "Se os trechos não bastarem para responder, diga que o material não cobre o assunto. "
-    "Não invente. Termine indicando o título do material usado."
+    "Não invente e não use o que você sabe de fora do material. "
+    f"Se os trechos não bastarem para responder, responda apenas {NAO_SEI}."
 )
 
 SISTEMA_DEMONSTRAR = BASE + (
@@ -139,10 +141,7 @@ class Agente:
             self._anotar(estado, texto)
             return Resposta(texto)
         if not trechos:
-            texto = ("O material da disciplina não cobre esse assunto. Tente reformular a pergunta "
-                     "com outras palavras, por exemplo usando o nome da ferramenta do Blender.")
-            self._anotar(estado, texto)
-            return Resposta(texto)
+            return self._nao_coberto(estado)
 
         contexto = "\n\n".join(f"[{i}] ({t['titulo']})\n{t['texto']}" for i, t in enumerate(trechos, 1))
         estado.mensagens = [
@@ -151,9 +150,17 @@ class Agente:
         ]
         # Neste modo a LLM não recebe nenhuma ferramenta (RF4).
         resposta = self.conversar(estado.modelo, estado.mensagens).message.content or ""
+        if NAO_SEI in resposta:
+            return self._nao_coberto(estado)
         fontes = sorted({f"{t['titulo']}" + (f" ({t['fonte']})" if t["fonte"] else "") for t in trechos})
         texto = resposta.strip() + "\n\n**Fontes:** " + "; ".join(fontes)
         self._anotar(estado, texto, fontes="; ".join(fontes))
+        return Resposta(texto)
+
+    def _nao_coberto(self, estado):
+        texto = ("O material da disciplina não cobre esse assunto. Tente reformular a pergunta "
+                 "com outras palavras, por exemplo usando o nome da ferramenta do Blender.")
+        self._anotar(estado, texto)
         return Resposta(texto)
 
     # --- RF7: Verificar ---

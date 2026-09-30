@@ -28,7 +28,7 @@ def test_filtros_e_csv(banco):
     banco.registrar_interacao(s1, "Explicar", "m", "o que é?")
     banco.registrar_interacao(s2, "Verificar", "m", "está certo?")
     assert len(banco.historico()) == 2
-    assert [l["estudante"] for l in banco.historico(modo="Verificar")] == ["P02"]
+    assert [linha["estudante"] for linha in banco.historico(modo="Verificar")] == ["P02"]
     assert banco.historico(desde="2999-01-01") == []
     assert para_csv(banco.historico(estudante="P01")).splitlines()[0].startswith("data,estudante,modo")
 

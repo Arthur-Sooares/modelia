@@ -15,7 +15,9 @@ from modelia import config, llm
 TAMANHO_TRECHO = 900  # caracteres, mais ou menos um parágrafo grande
 SOBREPOSICAO = 150
 # Distância de cosseno máxima para um trecho contar como relevante (0 = idêntico, 2 = oposto).
-LIMIAR_DISTANCIA = 0.55
+# Calibrado em 30/09/2026 com um texto de teste: perguntas do assunto ficaram entre 0,23 e 0,40 e uma
+# pergunta fora do assunto ficou em 0,51. Recalibrar quando a apostila real for indexada.
+LIMIAR_DISTANCIA = 0.45
 
 
 def ler_arquivo(caminho):

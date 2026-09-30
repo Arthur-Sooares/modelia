@@ -201,3 +201,11 @@ def test_tudo_fica_registrado_no_historico(banco):
     linhas = banco.historico(estudante="P01")
     assert len(linhas) == 1
     assert linhas[0]["modo"] == DEMONSTRAR and linhas[0]["codigo_executado"] == "passo1"
+
+
+def test_explicar_llm_diz_que_nao_sabe(banco):
+    llm = LLMFalsa(mensagem("NAO_SEI"))
+    trechos = [{"texto": "Subdivision Surface.", "titulo": "Manual", "fonte": "", "distancia": 0.3}]
+    ag = Agente(BlenderFalso(), ConhecimentoFalso(trechos), banco, conversar=llm)
+    resposta = ag.responder(novo_estado(banco, EXPLICAR), "como faço uma mesa?")
+    assert "não cobre" in resposta.texto and "Fontes" not in resposta.texto
