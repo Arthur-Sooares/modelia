@@ -1,0 +1,29 @@
+[project]
+name = "modelia"
+version = "0.1.0"
+description = "Modelia: tutor de modelagem 3D no Blender com LLM local (TCC IFNMG Januária)"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "chromadb>=1.5.9",
+    "gradio>=6.29.0",
+    "mcp>=1.2,<2",
+    "ollama>=0.6.2",
+    "pypdf>=6.19.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.9",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "B", "UP"]

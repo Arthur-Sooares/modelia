@@ -1,0 +1,15 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Dados locais do Modelia (banco, índice e resultados não vão para o Git)
+dados/
+resultados/
+*.blend1
