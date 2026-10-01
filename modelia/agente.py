@@ -39,7 +39,9 @@ SISTEMA_DEMONSTRAR = BASE + (
     " Você demonstra uma tarefa no Blender UM PASSO POR VEZ. Em cada passo:\n"
     "1. Explique em até 3 frases o que vai fazer e qual atalho de teclado o aluno usaria "
     "para fazer o mesmo à mão (por exemplo Shift+A para adicionar, G mover, R girar, S escalar, Tab modo de edição).\n"
-    "2. Chame a ferramenta execute_blender_code com o código Python (bpy) SÓ desse passo.\n"
+    "2. Chame a ferramenta execute_blender_code com o código Python (bpy) SÓ desse passo e a explicação "
+    "no campo explicacao.\n"
+    "O chão fica em z = 0: objetos que ficam apoiados devem encostar nele.\n"
     "Se precisar saber o que já existe na cena, use as ferramentas de leitura antes. "
     "Para devolver dados do código, atribua um dicionário à variável result. "
     "Depois de cada passo, espere o aluno pedir o próximo. "
@@ -246,7 +248,7 @@ class Agente:
 
     def _proximo_passo(self, estado, prefixo=""):
         """Roda a LLM até ela propor código (para e espera o clique) ou encerrar a tarefa."""
-        ferramentas = self.blender.ferramentas(FERRAMENTAS_LEITURA | {FERRAMENTA_EXECUTAR})
+        ferramentas = com_explicacao(self.blender.ferramentas(FERRAMENTAS_LEITURA | {FERRAMENTA_EXECUTAR}))
         for _ in range(config.MAX_RODADAS):
             mensagem = self.conversar(estado.modelo, estado.mensagens, ferramentas).message
             estado.mensagens.append(mensagem)
@@ -256,11 +258,12 @@ class Agente:
                 self._anotar(estado, texto)
                 return Resposta(texto + "\n\n*Demonstração concluída. Faça um novo pedido quando quiser.*")
 
-            codigo = None
+            codigo, explicacao = None, ""
             for chamada in mensagem.tool_calls:
                 nome = chamada.function.name
                 if nome == FERRAMENTA_EXECUTAR and codigo is None:
                     codigo = str(chamada.function.arguments.get("code", ""))
+                    explicacao = str(chamada.function.arguments.get("explicacao", "")).strip()
                 elif nome == FERRAMENTA_EXECUTAR:
                     estado.mensagens.append({"role": "tool", "tool_name": nome,
                                              "content": "Ignorado: faça um passo por vez."})
@@ -268,7 +271,8 @@ class Agente:
                     self._responder_ferramenta_leitura(estado, chamada)
             if codigo is not None:
                 estado.pendente = {"codigo": codigo, "interacao": estado.interacao["id"]}
-                explicacao = (mensagem.content or "").strip() or "Vou executar este passo no Blender."
+                explicacao = (explicacao or (mensagem.content or "").strip()
+                              or "Vou executar este passo no Blender.")
                 texto = prefixo + explicacao
                 self._anotar(estado, texto)
                 return Resposta(texto + "\n\nConfira o código abaixo e clique em **Executar** ou **Cancelar**.",
@@ -330,6 +334,30 @@ class Agente:
         self._anotar(estado, "[cancelado]")
         return Resposta("Cancelado: nada foi executado. Escreva **próximo** para a LLM propor outro "
                         "caminho, dê uma instrução diferente ou escreva **parar**.")
+
+
+def com_explicacao(ferramentas):
+    """Acrescenta à ferramenta de executar um campo obrigatório `explicacao` (RF5).
+
+    Sem isso, modelos pequenos costumam mandar só o código, sem explicar o passo nem o atalho.
+    O campo fica só entre o agente e a LLM: ao Blender vai apenas o `code`.
+    """
+    resultado = []
+    for ferramenta in ferramentas:
+        if ferramenta["function"]["name"] == FERRAMENTA_EXECUTAR:
+            funcao = dict(ferramenta["function"])
+            parametros = dict(funcao.get("parameters") or {})
+            parametros["properties"] = {
+                "explicacao": {"type": "string", "description": (
+                    "Para o aluno, em português e em até 3 frases: o que este passo faz e o atalho de "
+                    "teclado para fazer o mesmo à mão no Blender.")},
+                **parametros.get("properties", {}),
+            }
+            parametros["required"] = ["explicacao", *parametros.get("required", [])]
+            funcao["parameters"] = parametros
+            ferramenta = {**ferramenta, "function": funcao}
+        resultado.append(ferramenta)
+    return resultado
 
 
 def mensagem_de_erro(saida):

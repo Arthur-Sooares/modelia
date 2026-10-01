@@ -386,7 +386,7 @@ def criar_app(servicos=None):
                                 "limpa. Ao clicar em **Iniciar** você autoriza a execução automática do "
                                 "código gerado, só durante o experimento.")
                     with gr.Row():
-                        exp_modelos = gr.CheckboxGroup(label="Modelos", choices=[],
+                        exp_modelos = gr.CheckboxGroup(label="Modelos", choices=nomes_de_modelos(),
                                                        info="Os modelos que vão ser comparados.")
                         exp_tarefas = gr.CheckboxGroup(label="Tarefas", choices=ESCOLHAS_TAREFAS,
                                                        info="Cada tarefa tem correção automática de 0 a 3.")

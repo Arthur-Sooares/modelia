@@ -209,3 +209,22 @@ def test_explicar_llm_diz_que_nao_sabe(banco):
     ag = Agente(BlenderFalso(), ConhecimentoFalso(trechos), banco, conversar=llm)
     resposta = ag.responder(novo_estado(banco, EXPLICAR), "como faço uma mesa?")
     assert "não cobre" in resposta.texto and "Fontes" not in resposta.texto
+
+
+def test_demonstrar_usa_o_campo_explicacao(banco):
+    chamada = SimpleNamespace(function=SimpleNamespace(
+        name="execute_blender_code", arguments={"code": "c1", "explicacao": "Crio o tampo. Atalho: Shift+A."}))
+    resposta_llm = SimpleNamespace(message=SimpleNamespace(role="assistant", content="", tool_calls=[chamada]))
+    llm = LLMFalsa(resposta_llm)
+    ag = Agente(BlenderFalso(), None, banco, conversar=llm)
+    resposta = ag.responder(novo_estado(banco, DEMONSTRAR), "faça uma mesa")
+    assert "Shift+A" in resposta.texto and resposta.codigo == "c1"
+
+
+def test_com_explicacao_torna_o_campo_obrigatorio():
+    ferramentas = [{"type": "function", "function": {
+        "name": "execute_blender_code", "parameters": {"type": "object", "properties": {"code": {}},
+                                                      "required": ["code"]}}}]
+    parametros = agente.com_explicacao(ferramentas)[0]["function"]["parameters"]
+    assert parametros["required"] == ["explicacao", "code"]
+    assert "explicacao" not in ferramentas[0]["function"]["parameters"]["properties"]  # original intacto
