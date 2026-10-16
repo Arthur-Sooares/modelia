@@ -13,7 +13,7 @@ from pathlib import Path
 import gradio as gr
 
 from modelia import config, experimento, llm
-from modelia.agente import DEMONSTRAR, EXPLICAR, MODOS, VERIFICAR, Agente, Estado
+from modelia.agente import DEMONSTRAR, ENSINAR, EXPLICAR, MODOS, VERIFICAR, Agente, Estado
 from modelia.banco import Banco, para_csv
 from modelia.blender import Blender
 from modelia.conhecimento import Conhecimento
@@ -21,8 +21,10 @@ from modelia.tarefas import TAREFAS
 
 AJUDA_MODOS = {
     EXPLICAR: "Tire dúvidas sobre o Blender. A resposta vem do material da disciplina e não mexe na cena.",
-    DEMONSTRAR: "Peça uma tarefa (ex.: \"mostre como fazer uma mesa\"). O Modelia faz um passo por vez no "
-                "Blender e só executa depois do seu clique em Executar.",
+    ENSINAR: "Peça uma tarefa (ex.: \"me ensine a fazer uma mesa\"). O Modelia faz um passo por vez no "
+             "Blender, explica o atalho e só executa depois do seu clique em Executar.",
+    DEMONSTRAR: "Peça um objeto (ex.: \"crie uma mesa\"). O Modelia cria tudo sozinho no Blender, confere "
+                "a cena e corrige o que ficou fora do lugar.",
     VERIFICAR: "Faça a tarefa sozinho no Blender, escolha a tarefa-meta e pergunte \"minha cena está certa?\". "
                "Nada na sua cena é alterado.",
 }
@@ -242,8 +244,8 @@ def criar_app(servicos=None):
 
     # --- aba Experimento (RF10) ---
 
-    def total_previsto(modelos, tarefas, repeticoes):
-        total = len(modelos or []) * len(tarefas or []) * int(repeticoes or 0)
+    def total_previsto(modelos, tarefas, repeticoes, condicoes):
+        total = len(modelos or []) * len(tarefas or []) * int(repeticoes or 0) * len(condicoes or [])
         return f"Execuções previstas: **{total}**"
 
     def criar_cena_base(perfil):
@@ -254,10 +256,10 @@ def criar_app(servicos=None):
             raise gr.Error(str(erro)) from erro
         return f"Cena base salva em `{config.CENA_BASE}`."
 
-    def iniciar_experimento(modelos, tarefas, repeticoes, temperatura, seeds_texto, perfil):
+    def iniciar_experimento(modelos, tarefas, condicoes, repeticoes, temperatura, seeds_texto, perfil):
         exigir_pesquisador(perfil)
-        if not modelos or not tarefas:
-            raise gr.Error("Escolha pelo menos um modelo e uma tarefa.")
+        if not modelos or not tarefas or not condicoes:
+            raise gr.Error("Escolha pelo menos um modelo, uma tarefa e uma condição.")
         try:
             seeds = [int(x) for x in (seeds_texto or "1").replace(" ", "").split(",") if x]
         except ValueError as erro:
@@ -266,10 +268,10 @@ def criar_app(servicos=None):
         linhas, arquivo = [], None
         try:
             for feitas, total, linha, caminho_csv in experimento.rodar(
-                    s.blender, modelos, tarefas, int(repeticoes), float(temperatura), seeds,
+                    s.blender, modelos, tarefas, int(repeticoes), float(temperatura), seeds, condicoes,
                     deve_parar=s.parar_experimento.is_set):
                 arquivo = caminho_csv
-                linhas.insert(0, [linha.get(c, "") for c in experimento.CAMPOS[:12]])
+                linhas.insert(0, [linha.get(c, "") for c in experimento.CAMPOS[:13]])
                 yield f"Execução {feitas} de {total} concluída.", linhas, gr.File(visible=False)
         except FileNotFoundError as erro:
             raise gr.Error(f"{erro} Use o botão \"Criar cena base\".") from erro
@@ -312,8 +314,8 @@ def criar_app(servicos=None):
                                 modelo = gr.Dropdown(label="Modelo de LLM", choices=[],
                                                      info="A LLM que vai responder. Roda neste computador.")
                                 modo = gr.Radio(MODOS, value=EXPLICAR, label="Modo",
-                                                info="Explicar tira dúvidas, Demonstrar faz no Blender, "
-                                                     "Verificar corrige a sua cena.")
+                                                info="Explicar tira dúvidas, Ensinar faz passo a passo, "
+                                                     "Demonstrar cria sozinho, Verificar corrige a sua cena.")
                             ajuda_modo = gr.Markdown(AJUDA_MODOS[EXPLICAR])
                             tarefa = gr.Dropdown(ESCOLHAS_TAREFAS, label="Tarefa-meta", visible=False,
                                                  info="A tarefa que você fez e quer que o Modelia confira.")
@@ -326,7 +328,7 @@ def criar_app(servicos=None):
                             with gr.Row():
                                 mensagem = gr.Textbox(label="Mensagem", scale=5, submit_btn=False,
                                                       placeholder="Escreva aqui e aperte Enter",
-                                                      info="Em Demonstrar, escreva \"próximo\" para o passo "
+                                                      info="Em Ensinar, escreva \"próximo\" para o passo "
                                                            "seguinte ou \"parar\" para encerrar.")
                                 botao_enviar = gr.Button("Enviar", variant="primary", scale=1)
                         with gr.Column(scale=2):
@@ -390,6 +392,9 @@ def criar_app(servicos=None):
                                                        info="Os modelos que vão ser comparados.")
                         exp_tarefas = gr.CheckboxGroup(label="Tarefas", choices=ESCOLHAS_TAREFAS,
                                                        info="Cada tarefa tem correção automática de 0 a 3.")
+                        exp_condicoes = gr.CheckboxGroup(label="Condições", choices=experimento.CONDICOES,
+                                                         value=experimento.CONDICOES,
+                                                         info="puro: só o modelo. modelia: o modo Demonstrar.")
                     with gr.Row():
                         exp_repeticoes = gr.Number(label="Repetições", value=3, minimum=1, precision=0,
                                                    info="Quantas vezes cada modelo faz cada tarefa.")
@@ -397,13 +402,13 @@ def criar_app(servicos=None):
                                                     info="Quanto maior, mais variadas as respostas.")
                         exp_seeds = gr.Textbox(label="Seeds", value="1,2,3",
                                                info="Uma por repetição, separadas por vírgula.")
-                    previsto = gr.Markdown(total_previsto([], [], 3))
+                    previsto = gr.Markdown(total_previsto([], [], 3, experimento.CONDICOES))
                     with gr.Row():
                         botao_cena_base = gr.Button("Criar cena base")
                         botao_iniciar = gr.Button("Iniciar", variant="primary")
                         botao_parar = gr.Button("Parar", variant="stop")
                     progresso_exp = gr.Markdown()
-                    tabela_exp = gr.Dataframe(headers=experimento.CAMPOS[:12], interactive=False)
+                    tabela_exp = gr.Dataframe(headers=experimento.CAMPOS[:13], interactive=False)
                     arquivo_exp = gr.File(label="CSV do experimento", visible=False)
 
         # --- ligações ---
@@ -443,11 +448,11 @@ def criar_app(servicos=None):
         botao_exportar.click(exportar_historico, filtros, arquivo_hist)
 
         aba_experimento.select(lambda: gr.CheckboxGroup(choices=nomes_de_modelos()), None, exp_modelos)
-        for campo in (exp_modelos, exp_tarefas, exp_repeticoes):
-            campo.change(total_previsto, [exp_modelos, exp_tarefas, exp_repeticoes], previsto)
+        for campo in (exp_modelos, exp_tarefas, exp_repeticoes, exp_condicoes):
+            campo.change(total_previsto, [exp_modelos, exp_tarefas, exp_repeticoes, exp_condicoes], previsto)
         botao_cena_base.click(criar_cena_base, perfil, progresso_exp)
         botao_iniciar.click(iniciar_experimento,
-                            [exp_modelos, exp_tarefas, exp_repeticoes, exp_temperatura, exp_seeds, perfil],
+                            [exp_modelos, exp_tarefas, exp_condicoes, exp_repeticoes, exp_temperatura, exp_seeds, perfil],
                             [progresso_exp, tabela_exp, arquivo_exp])
         botao_parar.click(parar_experimento, perfil, progresso_exp)
 
