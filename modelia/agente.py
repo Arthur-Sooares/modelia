@@ -16,6 +16,7 @@ Estados de um passo do Ensinar:
 import ast
 import functools
 import json
+import re
 import threading
 import time
 import unicodedata
@@ -428,14 +429,17 @@ class Agente:
         for _ in range(config.MAX_RODADAS):
             mensagem = self.conversar(estado.modelo, estado.mensagens, ferramentas).message
             estado.mensagens.append(mensagem)
-            if not mensagem.tool_calls:
-                estado.em_ensino = False
-                texto = prefixo + (mensagem.content or "").strip()
-                self._anotar(estado, texto)
-                return Resposta(texto + "\n\n*Tarefa concluída. Faça um novo pedido quando quiser.*")
-
             codigo, explicacao = None, ""
-            for chamada in mensagem.tool_calls:
+            if not mensagem.tool_calls:
+                # Modelos pequenos (qwen3.5:4b) às vezes escrevem o código no texto em vez de chamar a ferramenta.
+                codigo, explicacao = codigo_no_texto(mensagem.content or "")
+                if codigo is None:
+                    estado.em_ensino = False
+                    texto = prefixo + (mensagem.content or "").strip()
+                    self._anotar(estado, texto)
+                    return Resposta(texto + "\n\n*Tarefa concluída. Faça um novo pedido quando quiser.*")
+
+            for chamada in mensagem.tool_calls or []:
                 nome = chamada.function.name
                 if nome == FERRAMENTA_EXECUTAR and codigo is None:
                     codigo = str(chamada.function.arguments.get("code", ""))
@@ -447,7 +451,7 @@ class Agente:
                     self._responder_ferramenta_leitura(estado, chamada)
             if codigo is not None:
                 estado.pendente = {"codigo": codigo, "interacao": estado.interacao["id"]}
-                explicacao = (explicacao or (mensagem.content or "").strip()
+                explicacao = (explicacao or (mensagem.tool_calls and (mensagem.content or "").strip())
                               or "Vou executar este passo no Blender.")
                 texto = prefixo + explicacao
                 self._anotar(estado, texto)
@@ -575,6 +579,17 @@ def problemas_da_cena(cena, tol=0.02):
             problemas.append(f"'{m['nome']}' está flutuando: a base está em z = {m['z_min']} "
                              "e não encosta no chão nem em outra peça.")
     return problemas
+
+
+BLOCO_PYTHON = re.compile(r"```(?:python|py)?[ \t]*\r?\n(.*?)```", re.DOTALL | re.IGNORECASE)
+
+
+def codigo_no_texto(texto):
+    """Separa o primeiro bloco ```python do texto: (código, texto sem o bloco) ou (None, texto)."""
+    achado = BLOCO_PYTHON.search(texto)
+    if not achado or "bpy" not in achado.group(1):
+        return None, texto
+    return achado.group(1).strip(), (texto[:achado.start()] + texto[achado.end():]).strip()
 
 
 def mensagem_de_erro(saida):

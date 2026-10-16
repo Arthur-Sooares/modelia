@@ -365,3 +365,16 @@ def test_pedidos_simultaneos_entram_na_fila(banco):
     for p in pedidos:
         p.join()
     assert maximo[0] == 1  # nunca dois pedidos falando com a LLM ao mesmo tempo
+
+
+def test_ensinar_aceita_codigo_escrito_no_texto(banco):
+    texto = "Vou criar o tampo. Atalho: Shift+A.\n\n```python\nimport bpy\nbpy.ops.mesh.primitive_cube_add()\n```"
+    blender = BlenderFalso()
+    ag = Agente(blender, None, banco, conversar=LLMFalsa(mensagem(texto)))
+    estado = novo_estado(banco, ENSINAR)
+
+    resposta = ag.responder(estado, "me ensina a fazer uma mesa")
+
+    assert resposta.codigo == "import bpy\nbpy.ops.mesh.primitive_cube_add()"
+    assert "Shift+A" in resposta.texto and "```" not in resposta.texto
+    assert blender.executados == [] and estado.em_ensino  # continua esperando o clique (RF6)
