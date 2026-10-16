@@ -1,0 +1,37 @@
+/* Cores e fontes do Modelia (página "Cores" e "Design System" do Figma, versão 2).
+   Usado pela home e pelo app em Gradio. As fontes ficam no projeto: o app roda sem internet. */
+
+@font-face {
+  font-family: "Unbounded";
+  src: url("fontes/unbounded.woff2") format("woff2");
+  font-weight: 200 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Host Grotesk";
+  src: url("fontes/host-grotesk.woff2") format("woff2");
+  font-weight: 300 800;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Martian Mono";
+  src: url("fontes/martian-mono.woff2") format("woff2");
+  font-weight: 100 800;
+  font-display: swap;
+}
+
+:root {
+  --fundo: #edeef1;
+  --cartao: #f7f8fa;
+  --lateral: #e8eaee;
+  --borda: #cfd1d8;
+  --tinta: #16161a;
+  --texto-2: #55565e;
+  --texto-3: #8a8b93;
+  --laranja: #ff6a13;
+  --azul: #3d5afe;
+  --verde: #1f9d55;
+  --display: "Unbounded", system-ui, sans-serif;
+  --corpo: "Host Grotesk", system-ui, sans-serif;
+  --mono: "Martian Mono", ui-monospace, monospace;
+}

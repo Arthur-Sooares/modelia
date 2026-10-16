@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Modelia · tutor de Blender com IA</title>
+  <meta name="description" content="O Modelia é um tutor de IA que ensina modelagem 3D no Blender, em português. TCC de Sistemas de Informação do IFNMG Campus Januária.">
+  <link rel="icon" href="img/marca.svg">
+  <link rel="stylesheet" href="base.css">
+  <link rel="stylesheet" href="home.css">
+  <script>
+    // --z: a prancheta de 1440 px do Figma se ajusta à largura da janela (no celular, home.css cuida).
+    document.documentElement.classList.add("js");
+    const ajustarZoom = () => {
+      const largura = document.documentElement.clientWidth;
+      document.documentElement.style.setProperty("--z", largura < 760 ? 1 : Math.min(largura / 1440, 1.25));
+    };
+    ajustarZoom();
+    addEventListener("resize", ajustarZoom);
+  </script>
+</head>
+<body>
+<div class="pagina">
+
+  <header class="nav">
+    <a class="marca" href="/"><img src="img/marca.svg" alt="">modelia</a>
+    <nav class="nav-links" aria-label="Principal">
+      <a href="#como-funciona">Como funciona</a>
+      <a href="#modos">Modos</a>
+      <a href="#perguntas">Perguntas</a>
+      <a class="botao botao-tinta" href="/app/">Entrar</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="palco hero" data-cena>
+      <p class="abs hero-rotulo"><img src="img/ponto-laranja-10.svg" alt="">Tutor de Blender com IA · Pesquisa do IFNMG Januária</p>
+      <h1 class="abs titulo" data-entra style="--dy:70px; --do:.6s; --dt:1s">
+        <span>Modelia: o tutor</span><span>de IA que ensina</span><span>você a modelar</span><span class="laranja">em 3D no Blender</span>
+      </h1>
+      <div class="abs hero-objeto" data-entra style="--d:.35s; --dy:0px; --de:.94; --do:.65s; --dt:1.05s">
+        <img class="preenche flutua" src="img/objeto-selecao.png" alt="Mesa laranja com cadeira azul modelada no Blender, selecionada">
+      </div>
+      <div class="abs hero-gizmo" data-entra style="--d:1.2s; --dy:0px; --do:.4s">
+        <img class="preenche flutua" src="img/gizmo.png" alt="">
+      </div>
+      <p class="abs rotulo-viewport mono" data-entra style="--d:1.3s; --dy:0px; --do:.4s">Mesa.001 selecionada</p>
+      <p class="abs pergunta" data-entra style="--d:1.8s; --dy:14px; --do:.3s; --dt:.5s">Como faço uma mesa?</p>
+      <p class="abs balao" data-entra style="--d:2.6s; --dy:14px; --do:.3s; --dt:.5s">Vamos por partes. Passo 1: o tampo. Aperte Shift + A e adicione um cubo.</p>
+      <div class="abs hero-base" data-entra style="--d:.55s; --dy:24px; --do:.54s; --dt:.9s">
+        <p>Abra o Blender, pergunte em português e aprenda fazendo. O Modelia explica, mostra o passo a passo na sua cena e confere o que você modelou.</p>
+        <div class="ctas">
+          <a class="botao botao-laranja" href="/app/">Entrar com o código da turma</a>
+          <a class="link-seta" href="#como-funciona">Ver como funciona <span>↓</span></a>
+        </div>
+      </div>
+    </section>
+
+    <div class="palco faixa" aria-hidden="true">
+      <div class="abs faixa-fita">
+        <div class="trilho">
+          <span>TCC de Sistemas de Informação</span><img src="img/estrela.svg" alt="">
+          <span>IFNMG Campus Januária</span><img src="img/estrela.svg" alt="">
+          <span>Gratuito para os participantes</span><img src="img/estrela.svg" alt="">
+          <span>A IA roda no próprio computador</span><img src="img/estrela.svg" alt="">
+          <span>TCC de Sistemas de Informação</span><img src="img/estrela.svg" alt="">
+          <span>IFNMG Campus Januária</span><img src="img/estrela.svg" alt="">
+          <span>Gratuito para os participantes</span><img src="img/estrela.svg" alt="">
+          <span>A IA roda no próprio computador</span><img src="img/estrela.svg" alt="">
+        </div>
+      </div>
+    </div>
+
+    <section class="secao" id="como-funciona">
+      <div class="cabeca">
+        <h2 class="titulo"><span>Como o Modelia</span><span>funciona.</span></h2>
+        <p class="lead">Três passos, do primeiro pedido ao seu primeiro objeto.</p>
+      </div>
+      <ol class="passos">
+        <li class="passo"><div class="passo-cartao">
+          <div class="passo-imagem"><img src="img/etapa-pontos.png" alt=""></div>
+          <p class="passo-numero">01 / 03</p>
+          <h3>Abra o Blender ao lado.</h3>
+          <p>O Modelia se conecta à sua cena e enxerga o que está nela.</p>
+        </div></li>
+        <li class="passo passo-2"><div class="passo-cartao">
+          <div class="passo-imagem"><img src="img/etapa-arame.png" alt=""></div>
+          <p class="passo-numero">02 / 03</p>
+          <h3>Peça em português.</h3>
+          <p>"Como faço uma mesa?" Não precisa saber os termos técnicos.</p>
+        </div></li>
+        <li class="passo passo-3"><div class="passo-cartao">
+          <div class="passo-imagem"><img src="img/etapa-final.png" alt=""></div>
+          <p class="passo-numero">03 / 03</p>
+          <h3>Aprenda fazendo.</h3>
+          <p>Ele explica, mostra na sua cena, você repete e ele confere.</p>
+        </div></li>
+      </ol>
+    </section>
+
+    <section class="secao video">
+      <div class="cabeca">
+        <h2 class="titulo"><span>Veja uma aula</span><span>acontecendo.</span></h2>
+        <p class="lead">Um pedido de verdade, do começo ao fim, sem cortes.</p>
+      </div>
+      <!-- ponytail: pôster parado até o vídeo da home (HyperFrames) ficar pronto -->
+      <div class="palco video-palco">
+        <img class="abs video-poster preenche" src="img/objeto-selecao.png" alt="">
+        <img class="abs video-play" src="img/play.svg" alt="">
+        <p class="abs video-legenda mono"><img class="pisca" src="img/gravando.svg" alt="">Espaço do vídeo · 16:9 · loop sem som</p>
+      </div>
+    </section>
+
+    <section class="palco explicar" id="modos" data-cena data-estado="vertice">
+      <div class="abs malha" data-alterna>
+        <div class="abs imagens">
+          <img class="troca-imagem" data-so="vertice" src="img/etapa-pontos.png" alt="Os vértices de uma mesa, só os pontos">
+          <img class="troca-imagem" data-so="aresta" src="img/etapa-arame.png" alt="A mesma mesa em arame, com as arestas">
+          <img class="troca-imagem" data-so="face" src="img/etapa-final.png" alt="A mesa pronta, com as faces">
+        </div>
+        <div class="abs seletor" role="group" aria-label="Parte da malha">
+          <button value="vertice" aria-pressed="true"><img class="ativo" src="img/ponto-laranja-8.svg" alt=""><img class="inativo" src="img/ponto-cinza-8.svg" alt="">vértice</button>
+          <button value="aresta" aria-pressed="false"><img class="ativo" src="img/ponto-laranja-8.svg" alt=""><img class="inativo" src="img/ponto-cinza-8.svg" alt="">aresta</button>
+          <button value="face" aria-pressed="false"><img class="ativo" src="img/ponto-laranja-8.svg" alt=""><img class="inativo" src="img/ponto-cinza-8.svg" alt="">face</button>
+        </div>
+        <p class="abs contagem rotulo-viewport mono" aria-live="polite">
+          <span data-so="vertice">80 vértices</span><span data-so="aresta">120 arestas</span><span data-so="face">60 faces · pronta</span>
+        </p>
+      </div>
+      <div class="abs texto-modo" data-entra style="--d:.1s">
+        <p class="etiqueta-modo"><img src="img/ponto-azul-10.svg" alt="">Modo Explicar</p>
+        <h2 class="titulo"><span>Tire dúvidas</span><span>com o material</span><span>da disciplina.</span></h2>
+        <p class="lead">Responde só com as apostilas da turma e mostra de onde tirou a resposta. Quando o material não cobre, ele avisa.</p>
+        <p class="dica">Clique em vértice, aresta e face para montar a mesa.</p>
+        <div class="conversa">
+          <p class="pergunta">O que é uma aresta?</p>
+          <div class="resposta" data-entra style="--d:1.6s; --dy:12px; --do:.3s; --dt:.5s">
+            <p>É a linha que liga dois vértices. Juntas, as arestas formam as faces da malha.</p>
+            <p class="fonte">Fonte: Apostila de Modelagem 3D, cap. 2</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="palco ensinar" data-cena>
+      <p class="abs palavra-fundo" aria-hidden="true">Ensinar</p>
+      <div class="abs texto-modo" data-entra style="--d:.1s">
+        <p class="etiqueta-modo"><img src="img/ponto-tinta-10.svg" alt="">Modo Ensinar</p>
+        <h2 class="titulo"><span>Um passo por vez,</span><span>com o atalho</span><span>de cada um.</span></h2>
+        <p class="lead">O Modelia explica o que vai fazer e mostra o atalho para você repetir à mão. O código aparece antes, e ele só executa quando você clica em Executar.</p>
+      </div>
+      <div class="abs argila"><img class="preenche flutua" style="--alto:-12px; animation-duration:4s" src="img/forma-argila.png" alt=""></div>
+      <div class="abs codigo" data-entra style="--d:.7s; --do:.48s; --dt:.8s" aria-hidden="true">
+        <p class="codigo-topo"><img class="pisca" style="animation-duration:1s" src="img/pulso.svg" alt="">Passo 1 de 3 · ainda não executado</p>
+        <pre><span data-entra style="--d:1.2s; --dy:0px; --do:.2s">bpy.ops.mesh.primitive_cube_add(location=(0, 0, 0.75))</span><span data-entra style="--d:1.5s; --dy:0px; --do:.2s">tampo = bpy.context.object</span><span data-entra style="--d:1.8s; --dy:0px; --do:.2s">tampo.scale = (1.0, 0.5, 0.05)</span></pre>
+        <p class="codigo-botoes"><span>Executar no Blender</span><span>Cancelar</span></p>
+      </div>
+    </section>
+
+    <section class="palco demonstrar" data-cena>
+      <div class="abs objeto-pronto"><img class="preenche" src="img/etapa-final.png" alt="Mesa laranja com cadeira azul, criadas pelo Modelia"></div>
+      <div class="abs texto-modo" data-entra style="--d:.1s">
+        <p class="etiqueta-modo"><img src="img/ponto-laranja-10.svg" alt="">Modo Demonstrar</p>
+        <h2 class="titulo"><span>Peça um objeto</span><span>e veja ele</span><span>ser montado.</span></h2>
+        <p class="lead">O Modelia cria o objeto inteiro na sua cena, confere as medidas e corrige o que ficou errado. Depois você estuda cada peça.</p>
+      </div>
+      <p class="abs pergunta" data-entra style="--d:1.8s; --dy:14px; --do:.3s; --dt:.5s">Faz uma mesa com cadeira?</p>
+      <p class="abs balao" data-entra style="--d:2.6s; --dy:14px; --do:.3s; --dt:.5s">Pronto. Tampo a 75 cm, quatro pernas e uma cadeira. Conferi as medidas e corrigi a altura das pernas.</p>
+      <p class="abs rotulo-viewport mono" data-entra style="--d:1.3s; --dy:0px; --do:.4s">3 de 3 medidas conferidas</p>
+    </section>
+
+    <section class="palco verificar" data-cena data-estado="antes" data-alterna>
+      <div class="abs imagens">
+        <img class="troca-imagem" data-so="antes" src="img/etapa-antes.png" alt="Mesa com as pernas 5 cm acima do chão">
+        <img class="troca-imagem" data-so="depois" src="img/etapa-final.png" alt="Mesa com as pernas tocando o chão">
+      </div>
+      <div class="cota" aria-hidden="true">
+        <img class="abs" data-so="antes" style="left:1261.3px; top:518.3px" src="img/cota-vao.svg" alt="">
+        <img class="abs" data-so="antes" style="left:1258.5px; top:515.5px" src="img/ponto-laranja-7.svg" alt="">
+        <img class="abs" data-so="antes" style="left:1258.5px; top:533.5px" src="img/ponto-laranja-7.svg" alt="">
+        <img class="abs" data-risca style="left:834.3px; top:314.3px; --d:.8s" src="img/cota-largura.svg" alt="">
+        <img class="abs" data-entra style="left:831.5px; top:311.5px; --d:.8s; --dy:0px; --do:.15s" src="img/ponto-tinta-7.svg" alt="">
+        <img class="abs" data-entra style="left:1281.5px; top:341.5px; --d:1.6s; --dy:0px; --do:.15s" src="img/ponto-tinta-7.svg" alt="">
+        <p class="abs cota-texto" data-entra style="left:1010px; top:292px; --d:1.5s; --dy:6px; --do:.4s; --dt:.4s">2,00 m</p>
+        <img class="abs" data-risca="v" style="left:1311.3px; top:379.3px; --d:1.9s" src="img/cota-altura.svg" alt="">
+        <img class="abs" data-entra style="left:1308.5px; top:376.5px; --d:1.9s; --dy:0px; --do:.15s" src="img/ponto-tinta-7.svg" alt="">
+        <img class="abs" data-entra style="left:1308.5px; top:532.5px; --d:2.7s; --dy:0px; --do:.15s" src="img/ponto-tinta-7.svg" alt="">
+        <p class="abs cota-texto" data-entra style="left:1326px; top:446px; --d:2.6s; --dy:6px; --do:.4s; --dt:.4s">0,75 m</p>
+      </div>
+      <p class="abs cota-texto cota-erro" data-so="antes">5 cm acima do chão</p>
+      <p class="abs cota-texto cota-certo" data-so="depois">✓ no chão</p>
+      <div class="abs texto-modo" data-entra style="--d:.1s">
+        <p class="etiqueta-modo"><img src="img/ponto-verde-10.svg" alt="">Modo Verificar</p>
+        <h2 class="titulo"><span>Fez sozinho?</span><span>Ele confere.</span></h2>
+        <p class="lead">O Modelia mede a sua cena, diz o que está certo e o que falta, e dá uma dica. Nunca altera o seu trabalho.</p>
+      </div>
+      <div class="abs resultado" aria-live="polite">
+        <p class="resultado-topo">Tarefa: Mesa <span class="nota" data-so="antes">nota 2 de 3</span><span class="nota nota-ok" data-so="depois">nota 3 de 3</span></p>
+        <ul>
+          <li>Tampo a 75 cm do chão</li>
+          <li>Quatro pernas iguais</li>
+          <li class="falta" data-so="antes">Pernas 5 cm acima do chão</li>
+          <li data-so="depois">Pernas tocando o chão</li>
+        </ul>
+      </div>
+      <div class="abs seletor" role="group" aria-label="Cena do aluno">
+        <button value="antes" aria-pressed="true"><img class="ativo" src="img/ponto-laranja-8.svg" alt=""><img class="inativo" src="img/ponto-cinza-8.svg" alt="">antes</button>
+        <button value="depois" aria-pressed="false"><img class="ativo" src="img/ponto-verde-8.svg" alt=""><img class="inativo" src="img/ponto-cinza-8.svg" alt="">depois</button>
+      </div>
+    </section>
+
+    <section class="secao grande diferencial" data-cena>
+      <h2 class="titulo" data-entra style="--d:.1s; --dy:50px; --do:.6s; --dt:1s"><span>Não é um gerador</span><span>de modelos.</span><span class="laranja">É um tutor.</span></h2>
+      <p data-entra style="--d:.7s; --dy:0px; --do:.5s">Outras ferramentas entregam o objeto pronto. O Modelia quer que você saiba fazer: explica cada passo, mostra o atalho e espera você tentar.</p>
+    </section>
+
+    <section class="secao grande privacidade" id="privacidade" data-cena>
+      <h2 class="titulo" data-entra style="--d:.1s; --dy:50px; --do:.6s; --dt:1s"><span>IA local.</span><span>Nada vai</span><span>para a nuvem.</span></h2>
+      <p data-entra style="--d:.7s; --dy:0px; --do:.5s">O modelo de IA roda no computador, sem internet. Por ser uma pesquisa, as conversas ficam registradas para análise, e você só participa depois de ler e aceitar o termo de consentimento.</p>
+    </section>
+
+    <section class="perguntas" id="perguntas" data-cena>
+      <h2 class="titulo"><span>Perguntas</span><span>frequentes.</span></h2>
+      <div class="lista-perguntas" data-entra style="--d:.6s; --dy:0px; --do:.5s">
+        <details open><summary>O que é o Modelia?</summary><p>Um tutor de IA que ensina modelagem 3D dentro do Blender, em português.</p></details>
+        <details open><summary>Preciso saber Blender?</summary><p>Não. Ele foi feito para quem está começando.</p></details>
+        <details open><summary>Preciso ter o Blender instalado?</summary><p>Sim, o Blender 5.1, que é gratuito.</p></details>
+        <details open><summary>O Modelia faz o modelo por mim?</summary><p>Só no modo Demonstrar, para você ver como se faz. Nos outros, quem modela é você.</p></details>
+        <details open><summary>Qual a diferença para o ChatGPT?</summary><p>O ChatGPT não vê a sua cena. O Modelia vê, age dentro do Blender e responde com o material da sua disciplina.</p></details>
+        <details open><summary>É pago?</summary><p>Não.</p></details>
+        <details open><summary>Funciona sem internet?</summary><p>Sim, a IA roda no computador.</p></details>
+        <details open><summary>Quem pode usar?</summary><p>Alunos com o código da turma.</p></details>
+        <details open><summary>O que acontece com os meus dados?</summary><p>Ficam no computador da pesquisa e são usados só no TCC, conforme o termo de consentimento.</p></details>
+      </div>
+    </section>
+
+    <section class="palco chamada" data-cena>
+      <div class="abs pontos" data-entra style="--d:.4s; --dy:0px; --do:1.2s"><img class="preenche" src="img/etapa-pontos.png" alt=""></div>
+      <h2 class="abs titulo" data-entra style="--d:.1s; --dy:50px; --do:.6s; --dt:1s"><span>Pronto para</span><span>modelar seu</span><span class="laranja">primeiro objeto?</span></h2>
+      <div class="abs ctas" data-entra style="--d:.9s; --dy:16px; --do:.36s; --dt:.6s">
+        <a class="botao botao-tinta" href="/app/">Entrar com o código da turma</a>
+        <a class="botao botao-contorno" href="/app/">Criar conta</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="rodape">
+    <div class="rodape-colunas">
+      <div class="rodape-marca">
+        <p class="marca"><img src="img/marca.svg" alt="">modelia</p>
+        <p>Modelia, tutor de Blender com IA. TCC de Sistemas de Informação, IFNMG Campus Januária.</p>
+      </div>
+      <div class="espaco"></div>
+      <ul><li>Produto</li><li><a href="#como-funciona">Como funciona</a></li><li><a href="#modos">Modos</a></li><li><a href="#perguntas">Perguntas</a></li><li><a href="/app/">Entrar</a></li></ul>
+      <ul><li>Projeto</li><li>Sobre o TCC</li><li>Termo de consentimento</li><li><a href="#privacidade">Privacidade</a></li></ul>
+      <ul><li>Feito com</li><li><a href="https://www.blender.org">Blender</a></li><li><a href="https://ollama.com">Ollama</a></li><li><a href="https://www.gradio.app">Gradio</a></li></ul>
+    </div>
+    <div class="rodape-barra"><p>© 2026 Modelia. TCC de Arthur Soares Cardoso.</p><p>Orientação: Prof. Helder</p></div>
+  </footer>
+</div>
+
+<script>
+  // Entradas: cada seção anima uma vez, quando aparece na tela.
+  const observador = new IntersectionObserver((entradas) => entradas.forEach((e) => {
+    if (e.isIntersecting) { e.target.classList.add("visto"); observador.unobserve(e.target); }
+  }), { threshold: 0.2 });
+  document.querySelectorAll("[data-cena]").forEach((cena) => observador.observe(cena));
+
+  // Blocos interativos (vértice/aresta/face e antes/depois): o botão escolhe o estado da seção.
+  document.querySelectorAll("[data-alterna]").forEach((bloco) => {
+    const alvo = bloco.closest("[data-estado]");
+    bloco.querySelectorAll(".seletor button").forEach((botao) => botao.addEventListener("click", () => {
+      alvo.dataset.estado = botao.value;
+      bloco.querySelectorAll(".seletor button").forEach((b) => b.setAttribute("aria-pressed", b === botao));
+    }));
+  });
+</script>
+</body>
+</html>
