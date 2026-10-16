@@ -90,7 +90,7 @@ SISTEMA_DEMONSTRAR = BASE + (
     " Agora você cria no Blender, sozinho e de uma vez, o objeto que o aluno pediu. "
     "Chame a ferramenta execute_blender_code UMA vez, com o código Python completo do objeto inteiro.\n"
     "O código já começa com estas funções prontas. Monte o objeto só com elas, sem bpy.ops, "
-    "e NÃO escreva def caixa, def cilindro, def cone, def esfera nem def limpar_cena (elas já existem):\n"
+    "e NÃO escreva def caixa, def cilindro, def cone, def esfera, def limpar_cena nem def ao_lado (elas já existem):\n"
     "- caixa(nome, largura, profundidade, altura, x=0, y=0, base=0, cor='#B8B8B8', chanfro=0.01, giro=0)\n"
     "- cilindro(nome, raio, altura, x=0, y=0, base=0, cor='#B8B8B8', chanfro=0.005, raio_topo=None, eixo='z'): "
     "raio_topo diferente de raio faz um tronco de cone (cúpula, vaso, pé torneado); eixo='x' ou 'y' deita o "
@@ -99,6 +99,7 @@ SISTEMA_DEMONSTRAR = BASE + (
     "- esfera(nome, raio, x=0, y=0, base=0, cor='#B8B8B8', achatar=1.0): achatar abaixo de 1 deixa mais baixa "
     "(almofada, pão, cúpula); a altura fica 2 * raio * achatar\n"
     "- limpar_cena(): apaga todas as malhas.\n"
+    "- with ao_lado(dx, dy=0): as peças criadas dentro do bloco saem deslocadas dx em X e dy em Y.\n"
     "Medidas em metros. largura vai no eixo X, profundidade no Y, altura no Z. x e y são o centro da peça. "
     "base é a altura (z) do ponto mais BAIXO da peça; o chão é z = 0. giro gira a caixa em graus em volta do eixo Z.\n"
     "Método para QUALQUER objeto:\n"
@@ -107,6 +108,9 @@ SISTEMA_DEMONSTRAR = BASE + (
     "2. No começo do código, escreva um comentário com a lista das peças e as medidas reais de cada uma.\n"
     "3. Monte de baixo para cima: uma peça apoiada em outra tem base = base + altura da peça de baixo. "
     "Peças lado a lado se encostam: o centro fica a meia largura de cada uma. Nada pode flutuar.\n"
+    "Pedido com vários objetos (mesa com cadeira): um objeto não pode ficar dentro do outro. "
+    "Crie o primeiro normalmente e TODAS as peças do segundo dentro de \"with ao_lado(1.2):\", "
+    "com as mesmas medidas que teriam sozinho; não some o deslocamento à mão.\n"
     "4. Dê nomes claros às peças e cores que combinem (madeira #8B5A2B ou #A0703C, metal #3A3A3A, "
     "tecido #5B6C8F, branco #EDEDE8, cerâmica #D9D4CC).\n"
     "Medidas típicas (metros): mesa 1,4 x 0,8 com topo a 0,75; cadeira com assento 0,45 x 0,45 a 0,45 do chão "
@@ -122,7 +126,14 @@ SISTEMA_DEMONSTRAR = BASE + (
     "    caixa(f'Perna{i + 1}', 0.06, 0.06, 0.71, x=x, y=y, cor=madeira)\n"
     "caixa('SaiaFrente', 1.18, 0.02, 0.08, y=-0.32, base=0.63, cor=madeira)\n"
     "caixa('SaiaTras', 1.18, 0.02, 0.08, y=0.32, base=0.63, cor=madeira)\n"
-    "Exemplo 2, luminária de mesa (a haste entra um pouco na cúpula):\n"
+    "Exemplo 2, cadeira (4 pernas sob o assento; o encosto é uma placa fina em pé no topo do assento, "
+    "na borda de trás, e não toca o chão):\n"
+    "madeira = '#A0703C'\n"
+    "for i, (x, y) in enumerate([(-0.19, -0.19), (0.19, -0.19), (-0.19, 0.19), (0.19, 0.19)]):\n"
+    "    caixa(f'Perna{i + 1}', 0.04, 0.04, 0.43, x=x, y=y, cor=madeira)\n"
+    "caixa('Assento', 0.45, 0.45, 0.04, base=0.43, cor=madeira)\n"
+    "caixa('Encosto', 0.45, 0.03, 0.43, y=0.21, base=0.47, cor=madeira)\n"
+    "Exemplo 3, luminária de mesa (a haste entra um pouco na cúpula):\n"
     "metal, cupula = '#3A3A3A', '#EDEDE8'\n"
     "cilindro('Base', 0.08, 0.02, cor=metal)\n"
     "cilindro('Haste', 0.01, 0.33, base=0.02, cor=metal)\n"
@@ -348,6 +359,9 @@ class Agente:
             estado.mensagens.append(mensagem)
             codigo = next((str(c.function.arguments.get("code", "")) for c in mensagem.tool_calls or []
                            if c.function.name == FERRAMENTA_EXECUTAR), None)
+            resumo = (mensagem.content or "").strip()
+            if codigo is None:
+                codigo, resumo = codigo_no_texto(resumo)
             if codigo is None:
                 if tentativa > 1:  # desistiu de corrigir
                     break
@@ -376,7 +390,7 @@ class Agente:
             else:
                 problemas = problemas_da_cena(self.blender.medir_cena())
                 if not problemas:
-                    texto = (mensagem.content or "").strip() or "Pronto, o objeto foi criado."
+                    texto = resumo or "Pronto, o objeto foi criado."
                     self._anotar(estado, texto)
                     return Resposta(texto + "\n\n*Veja a cena ao lado.*", atualizar_cena=True)
                 retorno = ("Executado, mas a medição da cena mostrou problemas:\n- " + "\n- ".join(problemas)
@@ -534,7 +548,7 @@ def com_explicacao(ferramentas):
     return resultado
 
 
-FUNCOES_PRONTAS = {"caixa", "cilindro", "cone", "esfera", "limpar_cena"}
+FUNCOES_PRONTAS = {"caixa", "cilindro", "cone", "esfera", "limpar_cena", "ao_lado"}
 
 
 def sem_redefinicoes(codigo):
@@ -555,8 +569,8 @@ def problemas_da_cena(cena, tol=0.02):
     """Peças abaixo do chão ou flutuando, pela medição de `Blender.medir_cena()`.
 
     Uma peça está apoiada se a base encosta no chão, no topo de outra peça ou fica dentro
-    da altura de outra (encaixe, como a perna que entra no tampo).
-    ponytail: só olha o eixo Z; uma peça sobre o vão de outra passa como apoiada.
+    da altura de outra (encaixe, como a perna que entra no tampo), e as duas se cruzam em X e Y.
+    ponytail: compara caixas alinhadas aos eixos; uma peça girada ocupa uma caixa maior que ela.
     """
     malhas = cena["malhas"]
     problemas = []
@@ -566,20 +580,28 @@ def problemas_da_cena(cena, tol=0.02):
             continue
         outras = [o for o in malhas if o is not m]
         apoiada = (abs(m["z_min"]) <= tol
-                   or any(o["z_min"] - tol <= m["z_min"] <= o["z_max"] + tol for o in outras))
+                   or any(o["z_min"] - tol <= m["z_min"] <= o["z_max"] + tol and se_cruzam(m, o, tol)
+                          for o in outras))
         if not apoiada:
             problemas.append(f"'{m['nome']}' está flutuando: a base está em z = {m['z_min']} "
                              "e não encosta no chão nem em outra peça.")
     return problemas
 
 
-BLOCO_PYTHON = re.compile(r"```(?:python|py)?[ \t]*\r?\n(.*?)```", re.DOTALL | re.IGNORECASE)
+def se_cruzam(a, b, tol):
+    """As caixas de a e b se encostam ou se sobrepõem no plano XY."""
+    ax0, ax1, ay0, ay1 = a["xy"]
+    bx0, bx1, by0, by1 = b["xy"]
+    return ax0 <= bx1 + tol and bx0 <= ax1 + tol and ay0 <= by1 + tol and by0 <= ay1 + tol
+
+
+BLOCO_PYTHON = re.compile(r"```(?:python|py)[ \t]*\r?\n(.*?)```", re.DOTALL | re.IGNORECASE)
 
 
 def codigo_no_texto(texto):
     """Separa o primeiro bloco ```python do texto: (código, texto sem o bloco) ou (None, texto)."""
     achado = BLOCO_PYTHON.search(texto)
-    if not achado or "bpy" not in achado.group(1):
+    if not achado:
         return None, texto
     return achado.group(1).strip(), (texto[:achado.start()] + texto[achado.end():]).strip()
 

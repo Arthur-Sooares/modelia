@@ -233,8 +233,10 @@ def test_com_explicacao_torna_o_campo_obrigatorio():
 
 # --- Demonstrar: cria sozinho, confere a cena e corrige ---
 
-PERNA_NO_CHAO = {"nome": "Perna", "dim": [0.06, 0.06, 0.71], "local": [0, 0, 0], "z_min": 0.0, "z_max": 0.71}
-TAMPO = {"nome": "Tampo", "dim": [0.04, 0.9, 1.6], "local": [0, 0, 0.71], "z_min": 0.71, "z_max": 0.75}
+PERNA_NO_CHAO = {"nome": "Perna", "dim": [0.06, 0.06, 0.71], "local": [0, 0, 0], "z_min": 0.0, "z_max": 0.71,
+                 "xy": [-0.03, 0.03, -0.03, 0.03]}
+TAMPO = {"nome": "Tampo", "dim": [0.04, 0.9, 1.6], "local": [0, 0, 0.71], "z_min": 0.71, "z_max": 0.75,
+         "xy": [-0.8, 0.8, -0.45, 0.45]}
 PERNA_FLUTUANDO = {**PERNA_NO_CHAO, "z_min": 0.3, "z_max": 1.01}
 
 
@@ -262,6 +264,9 @@ def test_problemas_da_cena():
     assert len(problemas) == 1 and "flutuando" in problemas[0]
     abaixo = {**PERNA_NO_CHAO, "z_min": -0.5}
     assert "abaixo do chão" in agente.problemas_da_cena({"malhas": [abaixo]})[0]
+    # assento na altura certa, mas ao lado da mesa: não encosta em nada
+    assento = {**TAMPO, "nome": "Assento", "xy": [1.0, 1.4, -0.2, 0.2]}
+    assert "Assento" in agente.problemas_da_cena({"malhas": [PERNA_NO_CHAO, TAMPO, assento]})[0]
 
 
 def test_demonstrar_executa_sem_clique(banco):
@@ -374,3 +379,11 @@ def test_ensinar_aceita_codigo_escrito_no_texto(banco):
     assert resposta.codigo == "import bpy\nbpy.ops.mesh.primitive_cube_add()"
     assert "Shift+A" in resposta.texto and "```" not in resposta.texto
     assert blender.executados == [] and estado.em_ensino  # continua esperando o clique (RF6)
+
+
+def test_demonstrar_aceita_codigo_escrito_no_texto(banco):
+    blender = BlenderDemonstrar({"malhas": [PERNA_NO_CHAO, TAMPO], "outros": []})
+    ag = Agente(blender, None, banco, conversar=LLMFalsa(mensagem("Mesa:\n```python\ncaixa(1)\n```")))
+    resposta = ag.responder(novo_estado(banco, DEMONSTRAR), "crie uma mesa")
+    assert blender.executados == ["caixa(1)"] and resposta.atualizar_cena
+    assert "```" not in resposta.texto and resposta.texto.startswith("Mesa:")

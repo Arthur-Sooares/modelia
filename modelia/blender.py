@@ -32,13 +32,15 @@ malhas = []
 for obj in bpy.context.scene.objects:
     if obj.type != 'MESH':
         continue
-    zs = [(obj.matrix_world @ v.co).z for v in obj.data.vertices] or [0.0]
+    pontos = [obj.matrix_world @ v.co for v in obj.data.vertices] or [obj.location]
+    xs, ys, zs = ([p[i] for p in pontos] for i in range(3))
     malhas.append({
         "nome": obj.name,
         "dim": sorted(round(d, 3) for d in obj.dimensions),
         "local": [round(c, 3) for c in obj.location],
         "z_min": round(min(zs), 3),
         "z_max": round(max(zs), 3),
+        "xy": [round(min(xs), 3), round(max(xs), 3), round(min(ys), 3), round(max(ys), 3)],
     })
 outros = [
     {"nome": o.name, "tipo": o.type, "subtipo": o.data.type if o.type == 'LIGHT' else "",
@@ -54,7 +56,7 @@ result = {"malhas": malhas, "outros": outros}
 # modelos pequenos erravam ou esqueciam. A malha é montada direto nos dados, sem bpy.ops,
 # para não depender do contexto da interface do Blender.
 AJUDANTES = '''
-import bpy, math
+import bpy, contextlib, math
 
 def _cor_linear(cor):
     cor = cor.lstrip("#")
@@ -76,6 +78,18 @@ def _material(cor):
         bsdf.inputs["Roughness"].default_value = 0.55
     return mat
 
+_deslocamento = [0.0, 0.0]
+
+@contextlib.contextmanager
+def ao_lado(dx=0, dy=0):
+    _deslocamento[0] += dx
+    _deslocamento[1] += dy
+    try:
+        yield
+    finally:
+        _deslocamento[0] -= dx
+        _deslocamento[1] -= dy
+
 def _objeto(nome, verts, faces, x, y, base, cor, chanfro, giro):
     malha = bpy.data.meshes.new(nome)
     malha.from_pydata(verts, [], faces)
@@ -83,7 +97,7 @@ def _objeto(nome, verts, faces, x, y, base, cor, chanfro, giro):
     malha.polygons.foreach_set("use_smooth", [True] * len(malha.polygons))
     obj = bpy.data.objects.new(nome, malha)
     bpy.context.scene.collection.objects.link(obj)
-    obj.location = (x, y, base)
+    obj.location = (x + _deslocamento[0], y + _deslocamento[1], base)
     obj.rotation_euler[2] = math.radians(giro)
     obj.data.materials.append(_material(cor))
     if chanfro > 0:
