@@ -387,3 +387,10 @@ def test_demonstrar_aceita_codigo_escrito_no_texto(banco):
     resposta = ag.responder(novo_estado(banco, DEMONSTRAR), "crie uma mesa")
     assert blender.executados == ["caixa(1)"] and resposta.atualizar_cena
     assert "```" not in resposta.texto and resposta.texto.startswith("Mesa:")
+
+
+def test_demonstrar_nao_mostra_o_codigo_repetido_no_texto(banco):
+    blender = BlenderDemonstrar({"malhas": [PERNA_NO_CHAO, TAMPO], "outros": []})
+    llm = LLMFalsa(mensagem("Vou criar a mesa.\n```python\ncaixa(1)\n```", codigo="caixa(1)"))
+    resposta = Agente(blender, None, banco, conversar=llm).responder(novo_estado(banco, DEMONSTRAR), "mesa")
+    assert "```" not in resposta.texto and resposta.texto.startswith("Vou criar a mesa.")

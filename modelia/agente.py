@@ -359,9 +359,9 @@ class Agente:
             estado.mensagens.append(mensagem)
             codigo = next((str(c.function.arguments.get("code", "")) for c in mensagem.tool_calls or []
                            if c.function.name == FERRAMENTA_EXECUTAR), None)
-            resumo = (mensagem.content or "").strip()
-            if codigo is None:
-                codigo, resumo = codigo_no_texto(resumo)
+            # O código pode vir também no texto, além da ferramenta: nunca mostra o código como resposta.
+            no_texto, resumo = codigo_no_texto(mensagem.content or "")
+            codigo = no_texto if codigo is None else codigo
             if codigo is None:
                 if tentativa > 1:  # desistiu de corrigir
                     break
@@ -457,7 +457,7 @@ class Agente:
                     self._responder_ferramenta_leitura(estado, chamada)
             if codigo is not None:
                 estado.pendente = {"codigo": codigo, "interacao": estado.interacao["id"]}
-                explicacao = (explicacao or (mensagem.tool_calls and (mensagem.content or "").strip())
+                explicacao = (explicacao or (mensagem.tool_calls and codigo_no_texto(mensagem.content or "")[1])
                               or "Vou executar este passo no Blender.")
                 texto = prefixo + explicacao
                 self._anotar(estado, texto)
@@ -602,7 +602,7 @@ def codigo_no_texto(texto):
     """Separa o primeiro bloco ```python do texto: (código, texto sem o bloco) ou (None, texto)."""
     achado = BLOCO_PYTHON.search(texto)
     if not achado:
-        return None, texto
+        return None, texto.strip()
     return achado.group(1).strip(), (texto[:achado.start()] + texto[achado.end():]).strip()
 
 
