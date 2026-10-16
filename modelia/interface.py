@@ -7,10 +7,14 @@ conferida também no servidor, e não só escondendo as abas.
 
 import tempfile
 import threading
+import webbrowser
 from datetime import datetime
 from pathlib import Path
 
 import gradio as gr
+import uvicorn
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from modelia import config, experimento, llm
 from modelia.agente import DEMONSTRAR, ENSINAR, EXPLICAR, MODOS, VERIFICAR, Agente, Estado
@@ -28,6 +32,7 @@ AJUDA_MODOS = {
     VERIFICAR: "Faça a tarefa sozinho no Blender, escolha a tarefa-meta e pergunte \"minha cena está certa?\". "
                "Nada na sua cena é alterado.",
 }
+PASTA_SITE = Path(__file__).parent / "site"
 ESCOLHAS_TAREFAS = [(t.nome, t.id) for t in TAREFAS.values()]
 COLUNAS_HISTORICO = ["data", "estudante", "modo", "modelo", "pedido", "resposta", "tarefa", "fontes",
                      "codigo_executado", "erros", "segundos"]
@@ -452,15 +457,25 @@ def criar_app(servicos=None):
             campo.change(total_previsto, [exp_modelos, exp_tarefas, exp_repeticoes, exp_condicoes], previsto)
         botao_cena_base.click(criar_cena_base, perfil, progresso_exp)
         botao_iniciar.click(iniciar_experimento,
-                            [exp_modelos, exp_tarefas, exp_condicoes, exp_repeticoes, exp_temperatura, exp_seeds, perfil],
+                            [exp_modelos, exp_tarefas, exp_condicoes, exp_repeticoes, exp_temperatura, exp_seeds,
+                             perfil],
                             [progresso_exp, tabela_exp, arquivo_exp])
         botao_parar.click(parar_experimento, perfil, progresso_exp)
 
     return app
 
 
+def criar_servidor():
+    """A home (site/) em "/" e o app em Gradio em "/app"."""
+    servidor = FastAPI()
+    gr.mount_gradio_app(servidor, criar_app(), path="/app", footer_links=[],
+                        allowed_paths=[str(config.PASTA_RESULTADOS)])
+    servidor.mount("/", StaticFiles(directory=PASTA_SITE, html=True), name="site")  # por último: pega o resto
+    return servidor
+
+
 def iniciar():
-    app = criar_app()
-    # RNF1 e RNF2: só no endereço local e nunca com share=True.
-    app.launch(server_name=config.HOST, server_port=config.PORTA, share=False, inbrowser=True,
-               footer_links=[], allowed_paths=[str(config.PASTA_RESULTADOS)])
+    # RNF1 e RNF2: só no endereço local, sem link público.
+    endereco = f"http://{config.HOST}:{config.PORTA}/"
+    threading.Timer(1.5, webbrowser.open, [endereco]).start()
+    uvicorn.run(criar_servidor(), host=config.HOST, port=config.PORTA)
