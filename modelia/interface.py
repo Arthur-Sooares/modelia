@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 
 from modelia import config, experimento, llm
 from modelia.agente import DEMONSTRAR, ENSINAR, EXPLICAR, MODOS, VERIFICAR, Agente, Estado
+from modelia.api import criar_api
 from modelia.banco import Banco, para_csv
 from modelia.blender import Blender
 from modelia.conhecimento import Conhecimento
@@ -466,9 +467,11 @@ def criar_app(servicos=None):
 
 
 def criar_servidor():
-    """A home (site/) em "/" e o app em Gradio em "/app"."""
+    """A home e o chat (site/) em "/", a API do chat em "/api" e o app em Gradio em "/app"."""
+    servicos = Servicos()
     servidor = FastAPI()
-    gr.mount_gradio_app(servidor, criar_app(), path="/app", footer_links=[],
+    servidor.include_router(criar_api(servicos))
+    gr.mount_gradio_app(servidor, criar_app(servicos), path="/app", footer_links=[],
                         allowed_paths=[str(config.PASTA_RESULTADOS)])
     servidor.mount("/", StaticFiles(directory=PASTA_SITE, html=True), name="site")  # por último: pega o resto
     return servidor
