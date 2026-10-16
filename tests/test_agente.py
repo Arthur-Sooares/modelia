@@ -341,3 +341,27 @@ def test_planejar_deixa_as_condicoes_lado_a_lado():
     plano = experimento.planejar(["m"], ["mesa"], 2, [1, 2])
     assert plano == [("puro", "m", "mesa", 1, 1), ("modelia", "m", "mesa", 1, 1),
                      ("puro", "m", "mesa", 2, 2), ("modelia", "m", "mesa", 2, 2)]
+
+
+def test_pedidos_simultaneos_entram_na_fila(banco):
+    import threading
+    import time
+
+    ativos, maximo = [0], [0]
+
+    def llm_lenta(modelo, mensagens, ferramentas=None, opcoes=None):
+        ativos[0] += 1
+        maximo[0] = max(maximo[0], ativos[0])
+        time.sleep(0.05)
+        ativos[0] -= 1
+        return mensagem("Resposta.")
+
+    ag = Agente(None, ConhecimentoFalso([{"titulo": "Apostila", "fonte": "", "texto": "..."}]), banco,
+                conversar=llm_lenta)
+    pedidos = [threading.Thread(target=ag.responder, args=(novo_estado(banco, EXPLICAR), "o que é?"))
+               for _ in range(3)]
+    for p in pedidos:
+        p.start()
+    for p in pedidos:
+        p.join()
+    assert maximo[0] == 1  # nunca dois pedidos falando com a LLM ao mesmo tempo

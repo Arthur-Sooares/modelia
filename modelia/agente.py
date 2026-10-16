@@ -14,7 +14,9 @@ Estados de um passo do Ensinar:
 """
 
 import ast
+import functools
 import json
+import threading
 import time
 import unicodedata
 from dataclasses import dataclass, field
@@ -180,12 +182,24 @@ class Estado:
     interacao: dict | None = None    # interação em andamento: {"id", "inicio", "resposta", "erros"}
 
 
+def na_fila(metodo):
+    """Um pedido por vez. Dois pedidos juntos dividiriam a LLM e mexeriam na mesma cena:
+    uma nova tentativa do Demonstrar apagaria os objetos que o outro pedido acabou de criar."""
+    @functools.wraps(metodo)
+    def na_vez(self, *args, **kwargs):
+        with self._fila:
+            return metodo(self, *args, **kwargs)
+    return na_vez
+
+
 class Agente:
     def __init__(self, blender, conhecimento, banco, conversar=llm.conversar):
         self.blender = blender
         self.conhecimento = conhecimento
         self.banco = banco
         self.conversar = conversar
+        # ponytail: fila única para todos os alunos; serve a um PC por aluno, como no laboratório.
+        self._fila = threading.RLock()
 
     # --- registro (RNF10) ---
 
@@ -205,6 +219,7 @@ class Agente:
 
     # --- entrada principal ---
 
+    @na_fila
     def responder(self, estado, mensagem, tarefa_id=""):
         mensagem = (mensagem or "").strip()
         if not mensagem:
@@ -443,6 +458,7 @@ class Agente:
         self._anotar(estado, texto)
         return Resposta(texto)
 
+    @na_fila
     def executar(self, estado):
         """Clique em "Executar" (RF6). Só aqui o código da LLM chega ao Blender."""
         pendente, estado.pendente = estado.pendente, None
@@ -484,6 +500,7 @@ class Agente:
         self._anotar(estado, "[executado]")
         return Resposta(texto, atualizar_cena=True)
 
+    @na_fila
     def cancelar(self, estado):
         """Clique em "Cancelar" (RF6): nada é executado e a LLM fica sabendo."""
         pendente, estado.pendente = estado.pendente, None
