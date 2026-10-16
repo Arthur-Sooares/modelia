@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Modelia · chat</title>
+  <link rel="icon" href="img/marca.svg">
+  <link rel="stylesheet" href="base.css">
+  <link rel="stylesheet" href="chat.css">
+</head>
+<body data-modo="Ensinar">
+
+<aside class="lateral" id="lateral">
+  <a class="marca" href="/"><span class="marca-m">m</span>modelia</a>
+  <button class="nova" id="nova" type="button"><span>+</span>Nova conversa</button>
+
+  <nav class="grupo" aria-label="Modo">
+    <p class="grupo-titulo">Modo</p>
+    <button class="item" data-modo="Explicar" type="button"><img src="img/ponto-azul-8.svg" alt="">Explicar</button>
+    <button class="item" data-modo="Ensinar" type="button"><img src="img/ponto-laranja-8.svg" alt="">Ensinar</button>
+    <button class="item" data-modo="Demonstrar" type="button"><img src="img/ponto-tinta-8.svg" alt="">Demonstrar</button>
+    <button class="item" data-modo="Verificar" type="button"><img src="img/ponto-verde-8.svg" alt="">Verificar</button>
+  </nav>
+
+  <nav class="grupo" id="hoje" aria-label="Conversas de hoje" hidden>
+    <p class="grupo-titulo">Hoje</p>
+  </nav>
+
+  <nav class="grupo" aria-label="Pesquisador">
+    <p class="grupo-titulo">Pesquisador</p>
+    <a class="item" href="/app/">Modelos</a>
+    <a class="item" href="/app/">Conhecimento</a>
+    <a class="item" href="/app/">Histórico</a>
+    <a class="item" href="/app/">Experimento</a>
+  </nav>
+
+  <div class="espaco"></div>
+  <div class="participante">
+    <span class="avatar">V</span>
+    <div>
+      <p class="participante-nome">Visitante</p>
+      <p class="estados">
+        <span id="estado-ollama"><img src="img/ponto-verde-7.svg" alt="">Ollama</span>
+        <span id="estado-blender"><img src="img/ponto-verde-7.svg" alt="">Blender</span>
+      </p>
+    </div>
+  </div>
+</aside>
+
+<main class="principal">
+  <header class="barra">
+    <button class="menu" id="menu" type="button" aria-label="Abrir menu" aria-controls="lateral">☰</button>
+    <label class="pilula modelo">
+      <span class="sr">Modelo de IA</span>
+      <select id="modelo"></select><span aria-hidden="true">▾</span>
+    </label>
+    <button class="pilula" id="botao-cena" type="button" aria-controls="painel" aria-expanded="false">
+      <img id="ponto-cena" src="img/ponto-verde-7.svg" alt="">Cena<span class="cena-extra">&nbsp;do Blender</span>
+    </button>
+  </header>
+
+  <section class="centro" id="centro" aria-live="polite">
+    <div class="boas-vindas" id="boas-vindas">
+      <h1 class="entra">Oi! O que vamos <span class="laranja">modelar</span> hoje?</h1>
+      <div class="sugestoes">
+        <button class="sugestao entra" style="--d:.4s" data-modo="Explicar" type="button">
+          <span class="sugestao-modo"><img src="img/ponto-azul-7.svg" alt="">Explicar</span>O que é extrusão e quando usar?</button>
+        <button class="sugestao entra" style="--d:.5s" data-modo="Ensinar" type="button">
+          <span class="sugestao-modo"><img src="img/ponto-laranja-7.svg" alt="">Ensinar</span>Me ensina a fazer uma mesa</button>
+        <button class="sugestao entra" style="--d:.6s" data-modo="Verificar" type="button">
+          <span class="sugestao-modo"><img src="img/ponto-verde-7.svg" alt="">Verificar</span>Minha mesa está certa?</button>
+        <button class="sugestao entra" style="--d:.7s" data-modo="Demonstrar" type="button">
+          <span class="sugestao-modo"><img src="img/ponto-tinta-7.svg" alt="">Demonstrar</span>Faz uma mesa com cadeira</button>
+      </div>
+    </div>
+  </section>
+
+  <form class="compositor" id="compositor">
+    <div class="caixa entra" style="--d:.3s">
+      <label class="sr" for="texto">Mensagem</label>
+      <textarea id="texto" rows="1" placeholder="Pergunte ou peça uma tarefa…"></textarea>
+      <div class="linha">
+        <div class="modos" role="group" aria-label="Modo">
+          <button type="button" data-modo="Explicar">Explicar</button>
+          <button type="button" data-modo="Ensinar">Ensinar</button>
+          <button type="button" data-modo="Demonstrar">Demonstrar</button>
+          <button type="button" data-modo="Verificar">Verificar</button>
+        </div>
+        <label class="tarefa" id="tarefa-rotulo" hidden>
+          <span class="sr">Tarefa-meta</span>
+          <select id="tarefa"></select><span aria-hidden="true">▾</span>
+        </label>
+        <button class="enviar" id="enviar" type="submit" aria-label="Enviar">
+          <img data-modo="Explicar" src="img/enviar-azul.svg" alt="">
+          <img data-modo="Ensinar" src="img/enviar-laranja.svg" alt="">
+          <img data-modo="Demonstrar" src="img/enviar-tinta.svg" alt="">
+          <img data-modo="Verificar" src="img/enviar-verde.svg" alt="">
+        </button>
+      </div>
+    </div>
+    <p class="aviso-geral">O Modelia pode errar. Confira sempre na cena do Blender.</p>
+  </form>
+</main>
+
+<aside class="painel" id="painel" hidden>
+  <div class="painel-topo">
+    <p>Cena do Blender</p>
+    <button class="atualizar" id="atualizar" type="button">Atualizar</button>
+  </div>
+  <div class="viewport" id="viewport"><p>Carregando a cena…</p></div>
+  <p class="painel-nota">Atualiza sozinha depois de cada passo.</p>
+  <div class="painel-cartao" id="painel-tarefa" hidden>
+    <p class="painel-cartao-titulo"></p>
+    <ul></ul>
+  </div>
+</aside>
+
+<template id="tpl-aluno">
+  <div class="msg-aluno entra"><p></p></div>
+</template>
+<template id="tpl-modelia">
+  <div class="msg-modelia entra"><span class="marca-m pequeno" aria-hidden="true">m</span><div class="corpo"></div></div>
+</template>
+<template id="tpl-codigo">
+  <div class="codigo entra" style="--d:.5s; --dy:24px">
+    <p class="codigo-topo"><img class="pisca" src="img/pulso.svg" alt=""><span>Código proposto, ainda não executado</span></p>
+    <pre></pre>
+    <p class="codigo-botoes">
+      <button class="executar" type="button">Executar no Blender</button>
+      <button class="cancelar" type="button">Cancelar</button>
+    </p>
+  </div>
+</template>
+<template id="tpl-resultado">
+  <div class="resultado">
+    <p class="resultado-topo"><span></span><span class="nota"></span></p>
+    <ul></ul>
+  </div>
+</template>
+
+<script src="chat.js"></script>
+</body>
+</html>
