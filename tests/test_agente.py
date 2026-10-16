@@ -239,7 +239,7 @@ PERNA_FLUTUANDO = {**PERNA_NO_CHAO, "z_min": 0.3, "z_max": 1.01}
 
 
 class BlenderDemonstrar(BlenderFalso):
-    """Devolve uma medição da fila a cada medir_cena (a primeira é a cena antes do pedido)."""
+    """Devolve uma medição da fila a cada medir_cena (uma por tentativa)."""
 
     def __init__(self, *cenas, erros=0):
         super().__init__(erros=erros)
@@ -265,8 +265,7 @@ def test_problemas_da_cena():
 
 
 def test_demonstrar_executa_sem_clique(banco):
-    vazia = {"malhas": [], "outros": []}
-    blender = BlenderDemonstrar(vazia, {"malhas": [PERNA_NO_CHAO, TAMPO], "outros": []})
+    blender = BlenderDemonstrar({"malhas": [PERNA_NO_CHAO, TAMPO], "outros": []})
     llm = LLMFalsa(mensagem("Criei uma mesa de madeira.", codigo="caixa(1)"))
     ag = Agente(blender, None, banco, conversar=llm)
     resposta = ag.responder(novo_estado(banco, DEMONSTRAR), "crie uma mesa")
@@ -276,20 +275,19 @@ def test_demonstrar_executa_sem_clique(banco):
 
 
 def test_demonstrar_corrige_peca_flutuando(banco):
-    vazia = {"malhas": [], "outros": []}
-    blender = BlenderDemonstrar(vazia, {"malhas": [PERNA_FLUTUANDO], "outros": []},
+    blender = BlenderDemonstrar({"malhas": [PERNA_FLUTUANDO], "outros": []},
                                 {"malhas": [PERNA_NO_CHAO, TAMPO], "outros": []})
     llm = LLMFalsa(mensagem("", codigo="caixa(1)"), mensagem("Mesa corrigida.", codigo="caixa(2)"))
     ag = Agente(blender, None, banco, conversar=llm)
     resposta = ag.responder(novo_estado(banco, DEMONSTRAR), "crie uma mesa")
-    assert blender.executados == ["caixa(1)", "caixa(2)"] and blender.removidos == [set()]
+    assert blender.executados == ["caixa(1)", "caixa(2)"] and blender.removidos == [set(), set()]
     assert "flutuando" in llm.chamadas[1]["mensagens"][-1]["content"]
     assert resposta.texto.startswith("Mesa corrigida.")
 
 
 def test_demonstrar_desiste_depois_das_tentativas(banco):
     flutuando = {"malhas": [PERNA_FLUTUANDO], "outros": []}
-    blender = BlenderDemonstrar({"malhas": [], "outros": []}, *[flutuando] * 3)
+    blender = BlenderDemonstrar(*[flutuando] * 3)
     llm = LLMFalsa(*[mensagem("", codigo=f"caixa({i})") for i in range(3)])
     ag = Agente(blender, None, banco, conversar=llm)
     resposta = ag.responder(novo_estado(banco, DEMONSTRAR), "crie uma mesa")
@@ -297,8 +295,7 @@ def test_demonstrar_desiste_depois_das_tentativas(banco):
 
 
 def test_demonstrar_recusa_codigo_sem_as_funcoes_prontas(banco):
-    vazia = {"malhas": [], "outros": []}
-    blender = BlenderDemonstrar(vazia, {"malhas": [PERNA_NO_CHAO, TAMPO], "outros": []})
+    blender = BlenderDemonstrar({"malhas": [PERNA_NO_CHAO, TAMPO], "outros": []})
     llm = LLMFalsa(mensagem("", codigo="bpy.ops.mesh.primitive_cube_add()"), mensagem("Mesa.", codigo="caixa(1)"))
     ag = Agente(blender, None, banco, conversar=llm)
     ag.responder(novo_estado(banco, DEMONSTRAR), "crie uma mesa")
@@ -317,9 +314,8 @@ def test_sem_redefinicoes_tira_so_as_funcoes_prontas():
 def test_experimento_modelia_usa_o_demonstrar_com_a_mesma_seed(banco):
     from modelia import experimento, tarefas
 
-    vazia = {"malhas": [], "outros": []}
     mesa = {"malhas": [PERNA_NO_CHAO, TAMPO], "outros": []}
-    blender = BlenderDemonstrar(vazia, mesa, mesa)
+    blender = BlenderDemonstrar(mesa, mesa)
     blender.abrir_cena = lambda caminho: None
     llm = LLMFalsa(mensagem("Mesa pronta.", codigo="caixa(1)"))
     opcoes_vistas = []

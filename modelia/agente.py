@@ -127,7 +127,6 @@ SISTEMA_DEMONSTRAR = BASE + (
     "cilindro('Base', 0.08, 0.02, cor=metal)\n"
     "cilindro('Haste', 0.01, 0.33, base=0.02, cor=metal)\n"
     "cilindro('Cupula', 0.12, 0.15, base=0.3, raio_topo=0.06, cor=cupula)\n"
-    "Se a cena tiver só o cubo padrão (Cube), comece o código com limpar_cena().\n"
     "Se o pedido trouxer medidas, use as medidas do pedido. "
     "Depois de executar, responda em UMA frase curta o que foi criado. "
     "Se o Modelia apontar um problema, mande o código completo do objeto de novo, já corrigido."
@@ -339,17 +338,9 @@ class Agente:
                      f"(porta {config.PORTA_BLENDER}).")
             self._anotar(estado, texto)
             return Resposta(texto)
-        try:
-            cena = self.blender.medir_cena()
-        except Exception as erro:
-            texto = str(erro)
-            self._anotar(estado, texto)
-            return Resposta(texto)
-        antes = {m["nome"] for m in cena["malhas"] if m["nome"] != "Cube"}
         estado.mensagens = [
             {"role": "system", "content": SISTEMA_DEMONSTRAR},
-            {"role": "user", "content": f"Pedido: {pedido}\n\nCena atual (metros): "
-                                        f"{json.dumps(cena, ensure_ascii=False)[:2500]}"},
+            {"role": "user", "content": f"Pedido: {pedido}"},
         ]
         ferramentas = self.blender.ferramentas({FERRAMENTA_EXECUTAR})
         for tentativa in range(1, config.MAX_TENTATIVAS + 1):
@@ -371,9 +362,10 @@ class Agente:
                     "Não executado: monte o objeto com as funções caixa(), cilindro(), cone() e esfera(), "
                     "sem bpy.ops. Mande o código completo de novo.")})
                 continue
-            if tentativa > 1:  # cada tentativa recria o objeto inteiro
-                self.blender.remover_malhas_exceto(antes)
             try:
+                # Cada pedido (e cada tentativa) recria o objeto inteiro numa cena vazia; sem isso
+                # o objeto novo nasce por cima do anterior.
+                self.blender.remover_malhas_exceto(set())
                 saida, erro = self.blender.executar_com_ajudantes(sem_redefinicoes(codigo))
             except Exception as falha:
                 saida, erro = str(falha), True
