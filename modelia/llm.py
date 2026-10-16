@@ -53,12 +53,19 @@ def apagar(nome):
 
 def conversar(modelo, mensagens, ferramentas=None, opcoes=None):
     """Uma rodada de conversa. Desliga o modo "pensar" quando o modelo aceita (fica mais rápido)."""
-    argumentos = {"model": modelo, "messages": mensagens, "options": opcoes or config.OPCOES_LLM}
+    opcoes = dict(opcoes or config.OPCOES_LLM)
+    if modelo in config.CAMADAS_GPU:
+        opcoes["num_gpu"] = config.CAMADAS_GPU[modelo]
+    argumentos = {"model": modelo, "messages": mensagens, "options": opcoes}
     if ferramentas:
         argumentos["tools"] = ferramentas
     try:
         return cliente.chat(think=False, **argumentos)
     except ollama.ResponseError as erro:
+        if "num_gpu" in opcoes and erro.status_code == 500:
+            # Outro programa (um jogo, o Blender) ocupou a VRAM e as camadas não couberam: o Ollama decide.
+            argumentos["options"] = {k: v for k, v in opcoes.items() if k != "num_gpu"}
+            return cliente.chat(think=False, **argumentos)
         if "think" not in str(erro).lower():
             raise
         return cliente.chat(**argumentos)

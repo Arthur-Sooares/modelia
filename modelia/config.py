@@ -24,6 +24,10 @@ OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
 MODELO_PADRAO = os.environ.get("MODELIA_MODELO", "gemma4:12b-it-qat")
 MODELO_EMBEDDINGS = "nomic-embed-text"
 OPCOES_LLM = {"temperature": 0.6, "num_ctx": 8192}
+# Camadas na GPU para modelos maiores que a placa (RTX 2060, 6 GB). O Ollama sozinho põe poucas.
+# Medido em 16/10/2026, com o Blender aberto: gemma4 com 42 camadas fez 5,9 tok/s e com o padrão fez 3,1.
+# Com todas as camadas fica mais lento, porque o Windows transborda a VRAM para a RAM.
+CAMADAS_GPU = {"gemma4:12b-it-qat": 42}
 VRAM_GB = float(os.environ.get("MODELIA_VRAM_GB", "6"))  # RNF7: máquina de referência
 
 # RNF8: servidor MCP oficial da Blender Lab, iniciado como subprocesso (stdio).
