@@ -63,7 +63,19 @@ function emLinha(texto) {
 }
 
 function blocos(texto) {
+  // ```código``` vem antes dos parágrafos: pode ter linhas em branco dentro. Índices ímpares = código.
+  return texto.split(/```[^\n]*\n([\s\S]*?)```/).flatMap((parte, i) => {
+    if (i % 2 === 0) return paragrafos(parte);
+    const pre = document.createElement("pre");
+    pre.className = "bloco-codigo";
+    pre.textContent = parte.replace(/\n$/, "");
+    return [pre];
+  });
+}
+
+function paragrafos(texto) {
   const saida = [];
+  if (!texto.trim()) return saida;
   for (const bloco of texto.trim().split(/\n{2,}/)) {
     const linhas = bloco.split("\n").filter((l) => l.trim());
     const lista = linhas.length && linhas.every((l) => /^\s*([-*•]|\d+[.)])\s+/.test(l));
