@@ -1,15 +1,19 @@
-"""Orquestrador do Modelia: os modos Explicar, Demonstrar e Verificar (RF4 a RF7).
+"""Orquestrador do Modelia: os modos Explicar, Ensinar, Demonstrar e Verificar (RF4 a RF7).
 
-A LLM nunca fala direto com o Blender. Quando ela pede para executar código, o agente
+No Ensinar a LLM nunca fala direto com o Blender. Quando ela pede para executar código, o agente
 guarda o pedido como "pendente" e devolve o controle à interface, que mostra o código
 com os botões Executar e Cancelar (RF6, OWASP LLM06 - agência excessiva).
+No Demonstrar o Modelia cria o objeto sozinho: executa, mede a cena e pede correção à LLM
+até nada ficar flutuando ou abaixo do chão. O add-on do Blender continua bloqueando
+operações perigosas.
 
-Estados de um passo do Demonstrar:
+Estados de um passo do Ensinar:
     aguardando pedido -> LLM pensando -> aguardando confirmação -> executando
         -> (erro e ainda há tentativas) LLM pensando
         -> (sucesso ou cancelado) aguardando "próximo"
 """
 
+import ast
 import json
 import time
 import unicodedata
@@ -19,8 +23,8 @@ from modelia import config, llm
 from modelia.blender import FERRAMENTA_EXECUTAR, FERRAMENTAS_LEITURA
 from modelia.tarefas import TAREFAS
 
-EXPLICAR, DEMONSTRAR, VERIFICAR = "Explicar", "Demonstrar", "Verificar"
-MODOS = [EXPLICAR, DEMONSTRAR, VERIFICAR]
+EXPLICAR, ENSINAR, DEMONSTRAR, VERIFICAR = "Explicar", "Ensinar", "Demonstrar", "Verificar"
+MODOS = [EXPLICAR, ENSINAR, DEMONSTRAR, VERIFICAR]
 
 NAO_SEI = "NAO_SEI"  # a LLM responde isto quando o material não cobre a dúvida
 
@@ -32,11 +36,24 @@ BASE = (
 SISTEMA_EXPLICAR = BASE + (
     " Responda à dúvida usando SOMENTE os trechos do material que vêm na mensagem. "
     "Não invente e não use o que você sabe de fora do material. "
-    f"Se os trechos não bastarem para responder, responda apenas {NAO_SEI}."
+    f"Se os trechos não bastarem para responder, responda apenas {NAO_SEI}.\n"
+    "Os exemplos abaixo só mostram o formato da resposta. Os trechos deles NÃO fazem parte do material.\n"
+    "Exemplo 1 (os trechos respondem):\n"
+    "Trechos do material:\n"
+    "[1] (Modo de Edição)\n"
+    "A extrusão puxa a face selecionada e cria geometria nova ligada à malha. No modo de edição (Tab), "
+    "selecione a face, aperte E, mova o mouse e clique para confirmar.\n"
+    "Dúvida do aluno: como eu puxo uma face para fora?\n"
+    "Resposta: Use a extrusão. Ela puxa a face e cria geometria nova ligada à malha. "
+    "Entre no modo de edição com Tab, selecione a face e aperte E. Mova o mouse e clique para confirmar.\n"
+    "Exemplo 2 (os trechos não respondem):\n"
+    "Trechos do material: os mesmos do exemplo 1.\n"
+    "Dúvida do aluno: como eu renderizo uma animação?\n"
+    f"Resposta: {NAO_SEI}"
 )
 
-SISTEMA_DEMONSTRAR = BASE + (
-    " Você demonstra uma tarefa no Blender UM PASSO POR VEZ. Em cada passo:\n"
+SISTEMA_ENSINAR = BASE + (
+    " Você ensina uma tarefa no Blender UM PASSO POR VEZ. Em cada passo:\n"
     "1. Explique em até 3 frases o que vai fazer e qual atalho de teclado o aluno usaria "
     "para fazer o mesmo à mão (por exemplo Shift+A para adicionar, G mover, R girar, S escalar, Tab modo de edição).\n"
     "2. Chame a ferramenta execute_blender_code com o código Python (bpy) SÓ desse passo e a explicação "
@@ -46,14 +63,90 @@ SISTEMA_DEMONSTRAR = BASE + (
     "Para devolver dados do código, atribua um dicionário à variável result. "
     "Depois de cada passo, espere o aluno pedir o próximo. "
     "Quando a tarefa estiver completa, não chame ferramentas: responda com um resumo curto do que foi feito "
-    "e a lista dos atalhos usados."
+    "e a lista dos atalhos usados.\n"
+    "O exemplo abaixo só mostra o formato. Para outra tarefa, crie os passos DESSA tarefa.\n"
+    "Exemplo, pedido \"faça um cone de trânsito\":\n"
+    "Passo 1, explicacao: Vou criar a base: uma placa de 0,4 m x 0,4 m com 0,04 m de altura, apoiada no chão. "
+    "À mão: Shift+A, Malha, Cubo; depois S para escalar e G, Z para subir.\n"
+    "Passo 1, code:\n"
+    "import bpy\n"
+    "bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 0.02))\n"
+    "bpy.context.object.name = 'Base'\n"
+    "bpy.context.object.scale = (0.4, 0.4, 0.04)\n"
+    "Passo 2, explicacao: Agora o cone, com 0,6 m de altura, em cima da base. O topo da base está em "
+    "z = 0,04, então o centro do cone fica em 0,04 + 0,3 = 0,34. À mão: Shift+A, Malha, Cone; depois G, Z.\n"
+    "Passo 2, code:\n"
+    "import bpy\n"
+    "bpy.ops.mesh.primitive_cone_add(radius1=0.15, radius2=0.02, depth=0.6, location=(0, 0, 0.34))\n"
+    "bpy.context.object.name = 'Cone'\n"
+    "Resumo final: Pronto! O cone de trânsito tem uma base no chão e um cone apoiado nela. "
+    "Atalhos usados: Shift+A (adicionar), S (escalar), G e Z (mover na altura)."
+)
+
+SISTEMA_DEMONSTRAR = BASE + (
+    " Agora você cria no Blender, sozinho e de uma vez, o objeto que o aluno pediu. "
+    "Chame a ferramenta execute_blender_code UMA vez, com o código Python completo do objeto inteiro.\n"
+    "O código já começa com estas funções prontas. Monte o objeto só com elas, sem bpy.ops, "
+    "e NÃO escreva def caixa, def cilindro, def cone, def esfera nem def limpar_cena (elas já existem):\n"
+    "- caixa(nome, largura, profundidade, altura, x=0, y=0, base=0, cor='#B8B8B8', chanfro=0.01, giro=0)\n"
+    "- cilindro(nome, raio, altura, x=0, y=0, base=0, cor='#B8B8B8', chanfro=0.005, raio_topo=None, eixo='z'): "
+    "raio_topo diferente de raio faz um tronco de cone (cúpula, vaso, pé torneado); eixo='x' ou 'y' deita o "
+    "cilindro (rolo, rodinha, barra), com o comprimento altura centrado em x e y\n"
+    "- cone(nome, raio, altura, x=0, y=0, base=0, cor='#B8B8B8', raio_topo=0)\n"
+    "- esfera(nome, raio, x=0, y=0, base=0, cor='#B8B8B8', achatar=1.0): achatar abaixo de 1 deixa mais baixa "
+    "(almofada, pão, cúpula); a altura fica 2 * raio * achatar\n"
+    "- limpar_cena(): apaga todas as malhas.\n"
+    "Medidas em metros. largura vai no eixo X, profundidade no Y, altura no Z. x e y são o centro da peça. "
+    "base é a altura (z) do ponto mais BAIXO da peça; o chão é z = 0. giro gira a caixa em graus em volta do eixo Z.\n"
+    "Método para QUALQUER objeto:\n"
+    "1. Pense em como o objeto real é e divida em peças simples (caixas, cilindros, cones, esferas). "
+    "Inclua os detalhes que fazem ele ser reconhecido (puxadores, rodapé, braços, alça, tampa).\n"
+    "2. No começo do código, escreva um comentário com a lista das peças e as medidas reais de cada uma.\n"
+    "3. Monte de baixo para cima: uma peça apoiada em outra tem base = base + altura da peça de baixo. "
+    "Peças lado a lado se encostam: o centro fica a meia largura de cada uma. Nada pode flutuar.\n"
+    "4. Dê nomes claros às peças e cores que combinem (madeira #8B5A2B ou #A0703C, metal #3A3A3A, "
+    "tecido #5B6C8F, branco #EDEDE8, cerâmica #D9D4CC).\n"
+    "Medidas típicas (metros): mesa 1,4 x 0,8 com topo a 0,75; cadeira com assento 0,45 x 0,45 a 0,45 do chão "
+    "e encosto até 0,9; banco alto 0,75; cama de solteiro 1,9 x 0,9, colchão de 0,2 sobre estrado a 0,25; "
+    "sofá 2,0 x 0,85, assento a 0,42, encosto até 0,8, braços até 0,6; estante 0,8 x 0,3 x 1,8 com prateleiras "
+    "a cada 0,35; armário 1,0 x 0,55 x 2,0; criado-mudo 0,45 x 0,4 x 0,55; luminária de mesa 0,45 de altura; "
+    "caneca raio 0,04 e altura 0,1; garrafa raio 0,035 e altura 0,3; porta 0,8 x 0,04 x 2,1.\n"
+    "Os exemplos abaixo só mostram o método. Para outro objeto, crie as peças DESSE objeto.\n"
+    "Exemplo 1, mesa (pernas recuadas dos cantos, saia logo abaixo do tampo):\n"
+    "madeira = '#8B5A2B'\n"
+    "caixa('Tampo', 1.4, 0.8, 0.04, base=0.71, cor=madeira)\n"
+    "for i, (x, y) in enumerate([(-0.62, -0.32), (0.62, -0.32), (-0.62, 0.32), (0.62, 0.32)]):\n"
+    "    caixa(f'Perna{i + 1}', 0.06, 0.06, 0.71, x=x, y=y, cor=madeira)\n"
+    "caixa('SaiaFrente', 1.18, 0.02, 0.08, y=-0.32, base=0.63, cor=madeira)\n"
+    "caixa('SaiaTras', 1.18, 0.02, 0.08, y=0.32, base=0.63, cor=madeira)\n"
+    "Exemplo 2, luminária de mesa (a haste entra um pouco na cúpula):\n"
+    "metal, cupula = '#3A3A3A', '#EDEDE8'\n"
+    "cilindro('Base', 0.08, 0.02, cor=metal)\n"
+    "cilindro('Haste', 0.01, 0.33, base=0.02, cor=metal)\n"
+    "cilindro('Cupula', 0.12, 0.15, base=0.3, raio_topo=0.06, cor=cupula)\n"
+    "Se a cena tiver só o cubo padrão (Cube), comece o código com limpar_cena().\n"
+    "Se o pedido trouxer medidas, use as medidas do pedido. "
+    "Depois de executar, responda em UMA frase curta o que foi criado. "
+    "Se o Modelia apontar um problema, mande o código completo do objeto de novo, já corrigido."
 )
 
 SISTEMA_VERIFICAR = BASE + (
     " O aluno fez uma tarefa sozinho no Blender e quer saber se está certa. Você recebe a meta, a medição "
     "da cena e a correção automática. Dê um feedback encorajador em três partes: o que está certo, o que falta "
     "e UMA dica do próximo passo. Não dê a solução completa nem código. Você pode usar as ferramentas de "
-    "leitura para ver detalhes de um objeto, mas nunca altera a cena."
+    "leitura para ver detalhes de um objeto, mas nunca altera a cena.\n"
+    "O exemplo abaixo só mostra o formato. Use sempre a meta e a correção que vêm na mensagem.\n"
+    "Exemplo:\n"
+    "Meta da tarefa: Crie um cilindro de 1 m de altura apoiado no chão.\n"
+    "Correção automática: nota 2/3.\n"
+    "Certo: [\"Cilindro 'Cylinder' com 1 m de altura.\"]\n"
+    "Falta: ['A base do cilindro está em z = -0.5; ela deve ficar no chão (z = 0).']\n"
+    "Pergunta do aluno: está certo?\n"
+    "Resposta:\n"
+    "**O que está certo:** você criou o cilindro com 1 m de altura. Muito bem!\n"
+    "**O que falta:** ele está metade enterrado. A base está em z = -0,5 e deveria estar no chão (z = 0).\n"
+    "**Dica:** selecione o cilindro e mova no eixo Z (G, depois Z). Quanto ele precisa subir para a base "
+    "encostar no chão?"
 )
 
 PALAVRAS_PROXIMO = {"proximo", "proxima", "continuar", "continue", "segue", "sim", "ok", "pode", "vai"}
@@ -82,7 +175,7 @@ class Estado:
     mensagens: list = field(default_factory=list)
     pendente: dict | None = None     # {"codigo", "interacao"} esperando o clique
     tentativas: int = 0              # erros seguidos no passo atual
-    em_demonstracao: bool = False
+    em_ensino: bool = False
     interacao: dict | None = None    # interação em andamento: {"id", "inicio", "resposta", "erros"}
 
 
@@ -123,7 +216,9 @@ class Agente:
             return self._explicar(estado, mensagem)
         if estado.modo == VERIFICAR:
             return self._verificar(estado, mensagem, tarefa_id)
-        return self._demonstrar(estado, mensagem)
+        if estado.modo == DEMONSTRAR:
+            return self._demonstrar(estado, mensagem)
+        return self._ensinar(estado, mensagem)
 
     def trocar_modo(self, estado, modo):
         """Mudar de modo começa um contexto novo para a LLM e encerra a demonstração em andamento."""
@@ -131,7 +226,7 @@ class Agente:
         estado.mensagens = []
         estado.pendente = None
         estado.tentativas = 0
-        estado.em_demonstracao = False
+        estado.em_ensino = False
 
     # --- RF4: Explicar ---
 
@@ -181,7 +276,7 @@ class Agente:
             return Resposta(texto)
         if not cena["malhas"]:
             texto = ("Sua cena ainda não tem nenhum objeto de malha. Comece a tarefa "
-                     f"**{tarefa.nome}** no Blender, ou use o modo **Demonstrar** para ver como se faz.")
+                     f"**{tarefa.nome}** no Blender, ou use o modo **Ensinar** para ver como se faz.")
             self._anotar(estado, texto, tarefa=tarefa.id)
             return Resposta(texto, atualizar_cena=True)
 
@@ -218,14 +313,78 @@ class Agente:
             saida = f"A ferramenta '{nome}' não está disponível neste modo."
         estado.mensagens.append({"role": "tool", "content": saida[:4000], "tool_name": nome})
 
-    # --- RF5 e RF6: Demonstrar ---
+    # --- Demonstrar: o Modelia cria o objeto sozinho ---
 
-    def _demonstrar(self, estado, mensagem):
+    def _demonstrar(self, estado, pedido):
+        if not self.blender.disponivel():
+            texto = ("O Blender não está conectado. Abra o Blender 5.1 e ligue o add-on MCP "
+                     f"(porta {config.PORTA_BLENDER}).")
+            self._anotar(estado, texto)
+            return Resposta(texto)
+        try:
+            cena = self.blender.medir_cena()
+        except Exception as erro:
+            texto = str(erro)
+            self._anotar(estado, texto)
+            return Resposta(texto)
+        antes = {m["nome"] for m in cena["malhas"] if m["nome"] != "Cube"}
+        estado.mensagens = [
+            {"role": "system", "content": SISTEMA_DEMONSTRAR},
+            {"role": "user", "content": f"Pedido: {pedido}\n\nCena atual (metros): "
+                                        f"{json.dumps(cena, ensure_ascii=False)[:2500]}"},
+        ]
+        ferramentas = self.blender.ferramentas({FERRAMENTA_EXECUTAR})
+        for tentativa in range(1, config.MAX_TENTATIVAS + 1):
+            mensagem = self.conversar(estado.modelo, estado.mensagens, ferramentas).message
+            estado.mensagens.append(mensagem)
+            codigo = next((str(c.function.arguments.get("code", "")) for c in mensagem.tool_calls or []
+                           if c.function.name == FERRAMENTA_EXECUTAR), None)
+            if codigo is None:
+                if tentativa > 1:  # desistiu de corrigir
+                    break
+                texto = ("A LLM não mandou código para o Blender. "
+                         "Tente pedir de outro jeito, por exemplo \"crie uma mesa\".")
+                self._anotar(estado, texto)
+                return Resposta(texto)
+            if not any(f"{funcao}(" in codigo for funcao in ("caixa", "cilindro", "cone", "esfera")):
+                # Sem as funções prontas os modelos erram a altura das peças e esquecem a cor.
+                self.banco.registrar_codigo(estado.interacao["id"], codigo, "recusado")
+                estado.mensagens.append({"role": "tool", "tool_name": FERRAMENTA_EXECUTAR, "content": (
+                    "Não executado: monte o objeto com as funções caixa(), cilindro(), cone() e esfera(), "
+                    "sem bpy.ops. Mande o código completo de novo.")})
+                continue
+            if tentativa > 1:  # cada tentativa recria o objeto inteiro
+                self.blender.remover_malhas_exceto(antes)
+            try:
+                saida, erro = self.blender.executar_com_ajudantes(sem_redefinicoes(codigo))
+            except Exception as falha:
+                saida, erro = str(falha), True
+            self.banco.registrar_codigo(estado.interacao["id"], codigo, "automatico", saida[:4000], erro)
+            if erro:
+                estado.interacao["erros"] += 1
+                retorno = f"ERRO do Blender: {mensagem_de_erro(saida)}\nMande o código completo corrigido."
+            else:
+                problemas = problemas_da_cena(self.blender.medir_cena())
+                if not problemas:
+                    texto = (mensagem.content or "").strip() or "Pronto, o objeto foi criado."
+                    self._anotar(estado, texto)
+                    return Resposta(texto + "\n\n*Veja a cena ao lado.*", atualizar_cena=True)
+                retorno = ("Executado, mas a medição da cena mostrou problemas:\n- " + "\n- ".join(problemas)
+                           + "\nMande o código completo do objeto de novo, corrigido.")
+            estado.mensagens.append({"role": "tool", "tool_name": FERRAMENTA_EXECUTAR, "content": retorno})
+        texto = (f"Fiz {config.MAX_TENTATIVAS} tentativas e o objeto ainda ficou com problemas. "
+                 "Veja a cena ao lado e peça de novo, se quiser com mais detalhes.")
+        self._anotar(estado, texto)
+        return Resposta(texto, atualizar_cena=True)
+
+    # --- RF5 e RF6: Ensinar (passo a passo, com confirmação) ---
+
+    def _ensinar(self, estado, mensagem):
         comando = normalizar(mensagem)
-        if estado.em_demonstracao and comando in PALAVRAS_PARAR:
-            estado.em_demonstracao = False
+        if estado.em_ensino and comando in PALAVRAS_PARAR:
+            estado.em_ensino = False
             estado.mensagens = []
-            texto = "Demonstração encerrada. A cena ficou como estava."
+            texto = "Tarefa encerrada. A cena ficou como estava."
             self._anotar(estado, texto)
             return Resposta(texto)
 
@@ -235,10 +394,10 @@ class Agente:
             self._anotar(estado, texto)
             return Resposta(texto)
 
-        if not estado.em_demonstracao:
-            estado.mensagens = [{"role": "system", "content": SISTEMA_DEMONSTRAR},
+        if not estado.em_ensino:
+            estado.mensagens = [{"role": "system", "content": SISTEMA_ENSINAR},
                                 {"role": "user", "content": mensagem}]
-            estado.em_demonstracao = True
+            estado.em_ensino = True
         elif comando in PALAVRAS_PROXIMO:
             estado.mensagens.append({"role": "user", "content": "Pode fazer o próximo passo."})
         else:
@@ -253,10 +412,10 @@ class Agente:
             mensagem = self.conversar(estado.modelo, estado.mensagens, ferramentas).message
             estado.mensagens.append(mensagem)
             if not mensagem.tool_calls:
-                estado.em_demonstracao = False
+                estado.em_ensino = False
                 texto = prefixo + (mensagem.content or "").strip()
                 self._anotar(estado, texto)
-                return Resposta(texto + "\n\n*Demonstração concluída. Faça um novo pedido quando quiser.*")
+                return Resposta(texto + "\n\n*Tarefa concluída. Faça um novo pedido quando quiser.*")
 
             codigo, explicacao = None, ""
             for chamada in mensagem.tool_calls:
@@ -277,7 +436,7 @@ class Agente:
                 self._anotar(estado, texto)
                 return Resposta(texto + "\n\nConfira o código abaixo e clique em **Executar** ou **Cancelar**.",
                                 codigo=codigo)
-        estado.em_demonstracao = False
+        estado.em_ensino = False
         texto = prefixo + "A LLM não conseguiu propor um passo. Tente descrever a tarefa de outro jeito."
         self._anotar(estado, texto)
         return Resposta(texto)
@@ -300,7 +459,7 @@ class Agente:
             estado.mensagens.append({"role": "tool", "tool_name": FERRAMENTA_EXECUTAR, "content": (
                 f"ERRO do Blender: {saida[:3000]}\nCorrija o código deste mesmo passo.")})
             if estado.tentativas >= config.MAX_TENTATIVAS:
-                estado.em_demonstracao = False
+                estado.em_ensino = False
                 estado.mensagens = []
                 texto = (f"O Blender recusou o código {estado.tentativas} vezes seguidas, então parei a "
                          "demonstração. Tente pedir a tarefa de outro jeito ou com passos menores.")
@@ -358,6 +517,45 @@ def com_explicacao(ferramentas):
             ferramenta = {**ferramenta, "function": funcao}
         resultado.append(ferramenta)
     return resultado
+
+
+FUNCOES_PRONTAS = {"caixa", "cilindro", "cone", "esfera", "limpar_cena"}
+
+
+def sem_redefinicoes(codigo):
+    """Tira do código as versões que a LLM escreveu das funções prontas (ela insiste em reescrevê-las
+    com bpy.ops, sem cor nem chanfro). Código que não compila volta igual: o erro aparece no Blender."""
+    try:
+        arvore = ast.parse(codigo)
+    except SyntaxError:
+        return codigo
+    corpo = [n for n in arvore.body if not (isinstance(n, ast.FunctionDef) and n.name in FUNCOES_PRONTAS)]
+    if len(corpo) == len(arvore.body):
+        return codigo
+    arvore.body = corpo
+    return ast.unparse(arvore)
+
+
+def problemas_da_cena(cena, tol=0.02):
+    """Peças abaixo do chão ou flutuando, pela medição de `Blender.medir_cena()`.
+
+    Uma peça está apoiada se a base encosta no chão, no topo de outra peça ou fica dentro
+    da altura de outra (encaixe, como a perna que entra no tampo).
+    ponytail: só olha o eixo Z; uma peça sobre o vão de outra passa como apoiada.
+    """
+    malhas = cena["malhas"]
+    problemas = []
+    for m in malhas:
+        if m["z_min"] < -tol:
+            problemas.append(f"'{m['nome']}' está abaixo do chão: a base está em z = {m['z_min']}.")
+            continue
+        outras = [o for o in malhas if o is not m]
+        apoiada = (abs(m["z_min"]) <= tol
+                   or any(o["z_min"] - tol <= m["z_min"] <= o["z_max"] + tol for o in outras))
+        if not apoiada:
+            problemas.append(f"'{m['nome']}' está flutuando: a base está em z = {m['z_min']} "
+                             "e não encosta no chão nem em outra peça.")
+    return problemas
 
 
 def mensagem_de_erro(saida):

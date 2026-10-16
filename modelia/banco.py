@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS codigos (
     interacao_id  INTEGER NOT NULL REFERENCES interacoes(id),
     data          TEXT NOT NULL,
     codigo        TEXT NOT NULL,
-    decisao       TEXT NOT NULL,          -- 'executado' ou 'cancelado'
+    decisao       TEXT NOT NULL,          -- 'executado', 'cancelado', 'automatico' ou 'recusado' (Demonstrar)
     resultado     TEXT NOT NULL DEFAULT '',
     erro          INTEGER NOT NULL DEFAULT 0
 );
@@ -140,7 +140,8 @@ class Banco:
             f"""
             SELECT i.data, s.estudante, i.modo, i.modelo, i.pedido, i.resposta, i.tarefa, i.fontes,
                    (SELECT group_concat(c.codigo, char(10) || '# ---' || char(10))
-                      FROM codigos c WHERE c.interacao_id = i.id AND c.decisao = 'executado') AS codigo_executado,
+                      FROM codigos c WHERE c.interacao_id = i.id
+                        AND c.decisao IN ('executado', 'automatico')) AS codigo_executado,
                    i.erros, i.segundos
               FROM interacoes i JOIN sessoes s ON s.id = i.sessao_id
               {onde}

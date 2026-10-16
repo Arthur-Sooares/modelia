@@ -49,6 +49,112 @@ result = {"malhas": malhas, "outros": outros}
 """
 
 
+# Funções prontas que vão antes do código da LLM no modo Demonstrar. Elas fazem a matemática
+# (centro, altura da base) e o acabamento (chanfro, sombreamento suave, material), que os
+# modelos pequenos erravam ou esqueciam. A malha é montada direto nos dados, sem bpy.ops,
+# para não depender do contexto da interface do Blender.
+AJUDANTES = '''
+import bpy, math
+
+def _cor_linear(cor):
+    cor = cor.lstrip("#")
+    srgb = [int(cor[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+    return [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in srgb] + [1.0]
+
+def _material(cor):
+    nome = "Modelia " + cor.upper()
+    mat = bpy.data.materials.get(nome) or bpy.data.materials.new(nome)
+    rgba = _cor_linear(cor)
+    mat.diffuse_color = rgba
+    try:
+        mat.use_nodes = True
+    except AttributeError:
+        pass
+    bsdf = mat.node_tree.nodes.get("Principled BSDF") if mat.node_tree else None
+    if bsdf:
+        bsdf.inputs["Base Color"].default_value = rgba
+        bsdf.inputs["Roughness"].default_value = 0.55
+    return mat
+
+def _objeto(nome, verts, faces, x, y, base, cor, chanfro, giro):
+    malha = bpy.data.meshes.new(nome)
+    malha.from_pydata(verts, [], faces)
+    malha.update()
+    malha.polygons.foreach_set("use_smooth", [True] * len(malha.polygons))
+    obj = bpy.data.objects.new(nome, malha)
+    bpy.context.scene.collection.objects.link(obj)
+    obj.location = (x, y, base)
+    obj.rotation_euler[2] = math.radians(giro)
+    obj.data.materials.append(_material(cor))
+    if chanfro > 0:
+        mod = obj.modifiers.new("Chanfro", "BEVEL")
+        mod.width = chanfro
+        mod.segments = 3
+        mod.limit_method = "ANGLE"
+        mod.harden_normals = True
+    return obj
+
+def caixa(nome, largura, profundidade, altura, x=0, y=0, base=0, cor="#B8B8B8", chanfro=0.01, giro=0):
+    l, p = largura / 2, profundidade / 2
+    verts = [(-l, -p, 0), (l, -p, 0), (l, p, 0), (-l, p, 0),
+             (-l, -p, altura), (l, -p, altura), (l, p, altura), (-l, p, altura)]
+    faces = [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]
+    chanfro = min(chanfro, min(largura, profundidade, altura) / 4)
+    return _objeto(nome, verts, faces, x, y, base, cor, chanfro, giro)
+
+def cilindro(nome, raio, altura, x=0, y=0, base=0, cor="#B8B8B8", chanfro=0.005, raio_topo=None,
+             eixo="z", lados=32):
+    topo = raio if raio_topo is None else raio_topo
+    def anel(r):
+        return [(r * math.cos(2 * math.pi * i / lados), r * math.sin(2 * math.pi * i / lados)) for i in range(lados)]
+    if eixo == "z":  # em pé, de base até base + altura
+        verts = [(a, b, 0) for a, b in anel(raio)] + [(a, b, altura) for a, b in anel(topo)]
+    else:  # deitado, centrado em x e y ao longo do eixo, com a parte de baixo em base
+        r = max(raio, topo)
+        pontas = [(a, b, -altura / 2) for a, b in anel(raio)] + [(a, b, altura / 2) for a, b in anel(topo)]
+        if eixo == "x":
+            verts = [(h, a, b + r) for a, b, h in pontas]
+        else:
+            verts = [(a, h, b + r) for a, b, h in pontas]
+    faces = [tuple(reversed(range(lados))), tuple(range(lados, 2 * lados))]
+    faces += [(i, (i + 1) % lados, lados + (i + 1) % lados, lados + i) for i in range(lados)]
+    if eixo == "y":  # trocar y com z espelha a malha; inverte as faces para as normais apontarem para fora
+        faces = [tuple(reversed(f)) for f in faces]
+    chanfro = min(chanfro, max(min(raio, topo), 0.001) / 4, altura / 4)
+    return _objeto(nome, verts, faces, x, y, base, cor, chanfro, 0)
+
+def cone(nome, raio, altura, x=0, y=0, base=0, cor="#B8B8B8", raio_topo=0.0):
+    return cilindro(nome, raio, altura, x, y, base, cor, 0, raio_topo=max(raio_topo, 0.0005))
+
+def esfera(nome, raio, x=0, y=0, base=0, cor="#B8B8B8", achatar=1.0, aneis=16, lados=32):
+    """achatar < 1 deixa a esfera mais baixa (almofada, cúpula); a altura fica 2 * raio * achatar."""
+    verts = [(0, 0, 0)]
+    for i in range(1, aneis):
+        fi = math.pi * i / aneis
+        for j in range(lados):
+            te = 2 * math.pi * j / lados
+            verts.append((raio * math.sin(fi) * math.cos(te), raio * math.sin(fi) * math.sin(te),
+                          raio * achatar * (1 - math.cos(fi))))
+    verts.append((0, 0, 2 * raio * achatar))
+    faces = []
+    for j in range(lados):
+        faces.append((0, 1 + (j + 1) % lados, 1 + j))
+    for i in range(aneis - 2):
+        a, b = 1 + i * lados, 1 + (i + 1) * lados
+        for j in range(lados):
+            faces.append((a + j, a + (j + 1) % lados, b + (j + 1) % lados, b + j))
+    ultimo, polo = 1 + (aneis - 2) * lados, len(verts) - 1
+    for j in range(lados):
+        faces.append((ultimo + j, ultimo + (j + 1) % lados, polo))
+    return _objeto(nome, verts, faces, x, y, base, cor, 0, 0)
+
+def limpar_cena():
+    for obj in [o for o in bpy.context.scene.objects if o.type == "MESH"]:
+        bpy.data.objects.remove(obj, do_unlink=True)
+
+'''
+
+
 def blender_escutando(host="127.0.0.1", porta=config.PORTA_BLENDER, espera=0.5):
     """Teste rápido: o add-on do Blender está aceitando conexões?"""
     try:
@@ -173,6 +279,17 @@ class Blender:
 
     def medir_cena(self):
         return self.rodar_codigo_interno(CODIGO_MEDIR)
+
+    def executar_com_ajudantes(self, codigo):
+        """Modo Demonstrar: o código da LLM roda depois das funções prontas (AJUDANTES)."""
+        return self.executar(AJUDANTES + codigo)
+
+    def remover_malhas_exceto(self, nomes):
+        """Desfaz uma tentativa do Demonstrar: apaga as malhas que não estavam na cena antes."""
+        codigo = (f"import bpy\nmanter = {sorted(nomes)!r}\n"
+                  "for o in [o for o in bpy.context.scene.objects if o.type == 'MESH' and o.name not in manter]:\n"
+                  "    bpy.data.objects.remove(o, do_unlink=True)\nresult = {'ok': True}")
+        self.rodar_codigo_interno(codigo)
 
     def abrir_cena(self, caminho):
         """RF10: reabre a cena base limpa antes de cada execução do experimento."""
