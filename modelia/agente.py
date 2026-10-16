@@ -164,6 +164,7 @@ class Resposta:
     texto: str
     codigo: str = ""               # preenchido quando há código esperando confirmação
     atualizar_cena: bool = False   # a interface deve pedir uma nova captura da cena
+    detalhes: dict | None = None   # Verificar: {"tarefa", "nota", "certo", "falta"} para o cartão de resultado
 
 
 @dataclass
@@ -292,7 +293,8 @@ class Agente:
         # Só ferramentas de leitura (RF7): o trabalho do aluno não pode ser alterado.
         texto = self._laco_leitura(estado, self.blender.ferramentas(FERRAMENTAS_LEITURA))
         self._anotar(estado, texto, tarefa=tarefa.id)
-        return Resposta(texto, atualizar_cena=True)
+        detalhes = {"tarefa": tarefa.nome, "nota": nota, "certo": certo, "falta": falta}
+        return Resposta(texto, atualizar_cena=True, detalhes=detalhes)
 
     def _laco_leitura(self, estado, ferramentas):
         """Deixa a LLM usar ferramentas de leitura até ela responder com texto."""

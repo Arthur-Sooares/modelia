@@ -184,6 +184,7 @@ def test_verificar_so_oferece_ferramentas_de_leitura(banco):
     assert "execute_blender_code" not in llm.chamadas[0]["ferramentas"]
     assert blender.executados == []
     assert resposta.texto == "Está certo!"
+    assert resposta.detalhes["tarefa"] == "Cubo no chão" and resposta.detalhes["nota"] == 3
 
 
 def test_verificar_cena_vazia_sugere_ensinar(banco):
