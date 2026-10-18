@@ -257,6 +257,9 @@ class BlenderDemonstrar(BlenderFalso):
     def remover_malhas_exceto(self, nomes):
         self.removidos.append(set(nomes))
 
+    def enquadrar(self):
+        self.enquadrado = True
+
 
 def test_problemas_da_cena():
     assert agente.problemas_da_cena({"malhas": [PERNA_NO_CHAO, TAMPO]}) == []
@@ -275,7 +278,7 @@ def test_demonstrar_executa_sem_clique(banco):
     ag = Agente(blender, None, banco, conversar=llm)
     resposta = ag.responder(novo_estado(banco, DEMONSTRAR), "crie uma mesa")
     assert blender.executados == ["caixa('P', 1, 1, 1)"] and resposta.codigo == ""
-    assert "mesa de madeira" in resposta.texto and resposta.atualizar_cena
+    assert "mesa de madeira" in resposta.texto and resposta.atualizar_cena and blender.enquadrado
     assert llm.chamadas[0]["ferramentas"] == {"execute_blender_code"}
 
 

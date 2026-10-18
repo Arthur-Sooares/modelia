@@ -50,6 +50,34 @@ outros = [
 result = {"malhas": malhas, "outros": outros}
 """
 
+# Centraliza todas as malhas na viewport, numa vista 3/4 de frente, para a captura mostrar o objeto
+# inteiro (na vista do aluno ele pode estar pequeno ou fora do quadro). A seleção do aluno volta igual.
+CODIGO_ENQUADRAR = """
+import bpy, math, mathutils
+malhas = [o for o in bpy.context.scene.objects if o.type == 'MESH']
+feito = False
+suave = bpy.context.preferences.view.smooth_view
+bpy.context.preferences.view.smooth_view = 0  # sem animação: a captura vem logo depois
+for janela in bpy.context.window_manager.windows:
+    for area in janela.screen.areas:
+        if feito or area.type != 'VIEW_3D' or not malhas:
+            continue
+        regiao = next(r for r in area.regions if r.type == 'WINDOW')
+        vista = area.spaces.active.region_3d
+        vista.view_perspective = 'PERSP'
+        vista.view_rotation = mathutils.Euler((math.radians(65), 0, math.radians(35))).to_quaternion()
+        with bpy.context.temp_override(window=janela, area=area, region=regiao):
+            selecionados = list(bpy.context.selected_objects)
+            for o in bpy.context.scene.objects:
+                o.select_set(o in malhas)
+            bpy.ops.view3d.view_selected()
+            for o in bpy.context.scene.objects:
+                o.select_set(o in selecionados)
+        feito = True
+bpy.context.preferences.view.smooth_view = suave
+result = {"ok": feito}
+"""
+
 
 # Funções prontas que vão antes do código da LLM no modo Demonstrar. Elas fazem a matemática
 # (centro, altura da base) e o acabamento (chanfro, sombreamento suave, material), que os
@@ -293,6 +321,9 @@ class Blender:
 
     def medir_cena(self):
         return self.rodar_codigo_interno(CODIGO_MEDIR)
+
+    def enquadrar(self):
+        return self.rodar_codigo_interno(CODIGO_ENQUADRAR)
 
     def executar_com_ajudantes(self, codigo):
         """Modo Demonstrar: o código da LLM roda depois das funções prontas (AJUDANTES)."""

@@ -421,6 +421,7 @@ class Agente:
                 if not problemas:
                     texto = resumo or "Pronto, o objeto foi criado."
                     self._anotar(estado, texto)
+                    self._enquadrar()
                     return Resposta(texto + "\n\n*Veja a cena ao lado.*", atualizar_cena=True)
                 retorno = ("Executado, mas a medição da cena mostrou problemas:\n- " + "\n- ".join(problemas)
                            + "\nMande o código completo do objeto de novo, corrigido.")
@@ -428,7 +429,15 @@ class Agente:
         texto = (f"Fiz {config.MAX_TENTATIVAS} tentativas e o objeto ainda ficou com problemas. "
                  "Veja a cena ao lado e peça de novo, se quiser com mais detalhes.")
         self._anotar(estado, texto)
+        self._enquadrar()
         return Resposta(texto, atualizar_cena=True)
+
+    def _enquadrar(self):
+        """Centraliza o objeto criado na vista do Blender (e na captura do chat). Falhar aqui não é erro."""
+        try:
+            self.blender.enquadrar()
+        except Exception:
+            pass
 
     # --- RF5 e RF6: Ensinar (passo a passo, com confirmação) ---
 
