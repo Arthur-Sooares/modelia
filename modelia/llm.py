@@ -110,5 +110,5 @@ def juntar(partes, ao_escrever):
 
 
 def embeddings(textos):
-    """Vetores de embeddings (RF8) com o modelo nomic-embed-text."""
+    """Vetores de embeddings (RF8) com o modelo config.MODELO_EMBEDDINGS."""
     return cliente.embed(model=config.MODELO_EMBEDDINGS, input=textos).embeddings

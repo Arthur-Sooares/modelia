@@ -22,7 +22,9 @@ PORTA = 7860
 # RNF3: LLM local pelo Ollama.
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
 MODELO_PADRAO = os.environ.get("MODELIA_MODELO", "gemma4:12b-it-qat")
-MODELO_EMBEDDINGS = "nomic-embed-text"
+# Multilíngue: no manual do Blender em português acertou o trecho certo (top-3) em 14 de 15 perguntas,
+# contra 6 de 15 do nomic-embed-text, que é treinado quase só em inglês (medido em 18/10/2026).
+MODELO_EMBEDDINGS = "qwen3-embedding:0.6b"
 OPCOES_LLM = {"temperature": 0.6, "num_ctx": 8192}
 # Quanto tempo o Ollama mantém o modelo na VRAM depois da última pergunta (o padrão dele é 5 min).
 # Carregar de novo custa ~1 min (medido em 18/10/2026 com o qwen3.5:4b).
