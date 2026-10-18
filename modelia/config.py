@@ -24,6 +24,9 @@ OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
 MODELO_PADRAO = os.environ.get("MODELIA_MODELO", "gemma4:12b-it-qat")
 MODELO_EMBEDDINGS = "nomic-embed-text"
 OPCOES_LLM = {"temperature": 0.6, "num_ctx": 8192}
+# Quanto tempo o Ollama mantém o modelo na VRAM depois da última pergunta (o padrão dele é 5 min).
+# Carregar de novo custa ~1 min (medido em 18/10/2026 com o qwen3.5:4b).
+MANTER_CARREGADO = os.environ.get("MODELIA_MANTER_CARREGADO", "30m")
 # Camadas na GPU para modelos maiores que a placa (RTX 2060, 6 GB). O Ollama sozinho põe poucas.
 # Medido em 16/10/2026, com o Blender aberto: gemma4 com 42 camadas fez 5,9 tok/s e com o padrão fez 3,1.
 # Com todas as camadas fica mais lento, porque o Windows transborda a VRAM para a RAM.

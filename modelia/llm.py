@@ -51,15 +51,31 @@ def apagar(nome):
     cliente.delete(nome)
 
 
+def opcoes_de(modelo, opcoes=None):
+    opcoes = dict(opcoes or config.OPCOES_LLM)
+    if modelo in config.CAMADAS_GPU:
+        opcoes["num_gpu"] = config.CAMADAS_GPU[modelo]
+    return opcoes
+
+
+def aquecer(modelo):
+    """Carrega o modelo na VRAM antes da primeira pergunta (a primeira carga leva ~1 min).
+    Usa as mesmas opções das conversas: com num_ctx ou num_gpu diferentes o Ollama recarregaria."""
+    try:
+        cliente.chat(model=modelo, messages=[], options=opcoes_de(modelo), keep_alive=config.MANTER_CARREGADO)
+        return True
+    except Exception:
+        return False  # Ollama desligado ou modelo não instalado: a primeira pergunta carrega, como antes.
+
+
 def conversar(modelo, mensagens, ferramentas=None, opcoes=None, ao_escrever=None):
     """Uma rodada de conversa. Desliga o modo "pensar" quando o modelo aceita (fica mais rápido).
 
     Com `ao_escrever`, a resposta vem aos pedaços (streaming): a função recebe o texto escrito
     até agora a cada pedaço, e no fim volta a mesma resposta completa de sempre."""
-    opcoes = dict(opcoes or config.OPCOES_LLM)
-    if modelo in config.CAMADAS_GPU:
-        opcoes["num_gpu"] = config.CAMADAS_GPU[modelo]
-    argumentos = {"model": modelo, "messages": mensagens, "options": opcoes}
+    opcoes = opcoes_de(modelo, opcoes)
+    argumentos = {"model": modelo, "messages": mensagens, "options": opcoes,
+                  "keep_alive": config.MANTER_CARREGADO}
     if ferramentas:
         argumentos["tools"] = ferramentas
 

@@ -481,4 +481,5 @@ def iniciar():
     # RNF1 e RNF2: só no endereço local, sem link público.
     endereco = f"http://{config.HOST}:{config.PORTA}/"
     threading.Timer(1.5, webbrowser.open, [endereco]).start()
+    threading.Thread(target=llm.aquecer, args=(config.MODELO_PADRAO,), daemon=True).start()
     uvicorn.run(criar_servidor(), host=config.HOST, port=config.PORTA)
