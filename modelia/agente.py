@@ -23,7 +23,7 @@ import unicodedata
 from dataclasses import dataclass, field
 
 from modelia import config, llm
-from modelia.blender import FERRAMENTA_EXECUTAR, FERRAMENTAS_LEITURA
+from modelia.blender import AJUDANTES, FERRAMENTA_EXECUTAR, FERRAMENTAS_LEITURA
 from modelia.tarefas import TAREFAS
 
 EXPLICAR, ENSINAR, DEMONSTRAR, VERIFICAR = "Explicar", "Ensinar", "Demonstrar", "Verificar"
@@ -394,6 +394,15 @@ class Agente:
                     "Não executado: monte o objeto com as funções caixa(), cilindro(), cone() e esfera(), "
                     "sem bpy.ops. Mande o código completo de novo.")})
                 continue
+            invalido = validar(sem_redefinicoes(codigo))
+            if invalido:
+                # Erro achado aqui não gasta uma ida ao Blender e explica exatamente o que corrigir.
+                self.banco.registrar_codigo(estado.interacao["id"], codigo, "recusado", "\n".join(invalido), True)
+                estado.interacao["erros"] += 1
+                estado.mensagens.append({"role": "tool", "tool_name": FERRAMENTA_EXECUTAR, "content": (
+                    "Não executado, o código tem erros:\n- " + "\n- ".join(invalido)
+                    + "\nMande o código completo corrigido.")})
+                continue
             try:
                 # Cada pedido (e cada tentativa) recria o objeto inteiro numa cena vazia; sem isso
                 # o objeto novo nasce por cima do anterior.
@@ -583,6 +592,47 @@ def sem_redefinicoes(codigo):
         return codigo
     arvore.body = corpo
     return ast.unparse(arvore)
+
+
+def _assinaturas():
+    """Parâmetros de cada função pronta, lidos do próprio código delas (blender.AJUDANTES)."""
+    assinaturas = {}
+    for n in ast.parse(AJUDANTES).body:
+        if isinstance(n, ast.FunctionDef) and n.name in FUNCOES_PRONTAS:
+            nomes = [a.arg for a in n.args.args]
+            assinaturas[n.name] = (nomes, nomes[:len(nomes) - len(n.args.defaults)])  # (todos, obrigatórios)
+    return assinaturas
+
+
+ASSINATURAS = _assinaturas()
+
+
+def validar(codigo):
+    """Confere o código do Demonstrar antes de ir ao Blender: sintaxe e chamadas às funções prontas
+    (parâmetro que não existe, faltando ou sobrando). Devolve a lista de problemas; vazia = pode executar."""
+    try:
+        arvore = ast.parse(codigo)
+    except SyntaxError as erro:
+        return [f"Erro de sintaxe na linha {erro.lineno}: {erro.msg}."]
+    problemas = []
+    for n in ast.walk(arvore):
+        if not (isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id in ASSINATURAS):
+            continue
+        if any(isinstance(a, ast.Starred) for a in n.args) or any(k.arg is None for k in n.keywords):
+            continue  # *args / **kwargs: só o Blender sabe
+        nomes, obrigatorios = ASSINATURAS[n.func.id]
+        chamada = f"Linha {n.lineno}, {n.func.id}()"
+        if len(n.args) > len(nomes):
+            problemas.append(f"{chamada}: recebeu {len(n.args)} valores sem nome, mas aceita no máximo {len(nomes)}.")
+        estranhos = [k.arg for k in n.keywords if k.arg not in nomes]
+        if estranhos:
+            problemas.append(f"{chamada}: o parâmetro {', '.join(estranhos)} não existe. "
+                             f"Os parâmetros são: {', '.join(nomes)}.")
+        dados = set(nomes[:len(n.args)]) | {k.arg for k in n.keywords}
+        faltando = [p for p in obrigatorios if p not in dados]
+        if faltando:
+            problemas.append(f"{chamada}: falta {', '.join(faltando)}.")
+    return problemas
 
 
 def problemas_da_cena(cena, tol=0.02):

@@ -271,10 +271,10 @@ def test_problemas_da_cena():
 
 def test_demonstrar_executa_sem_clique(banco):
     blender = BlenderDemonstrar({"malhas": [PERNA_NO_CHAO, TAMPO], "outros": []})
-    llm = LLMFalsa(mensagem("Criei uma mesa de madeira.", codigo="caixa(1)"))
+    llm = LLMFalsa(mensagem("Criei uma mesa de madeira.", codigo="caixa('P', 1, 1, 1)"))
     ag = Agente(blender, None, banco, conversar=llm)
     resposta = ag.responder(novo_estado(banco, DEMONSTRAR), "crie uma mesa")
-    assert blender.executados == ["caixa(1)"] and resposta.codigo == ""
+    assert blender.executados == ["caixa('P', 1, 1, 1)"] and resposta.codigo == ""
     assert "mesa de madeira" in resposta.texto and resposta.atualizar_cena
     assert llm.chamadas[0]["ferramentas"] == {"execute_blender_code"}
 
@@ -282,10 +282,10 @@ def test_demonstrar_executa_sem_clique(banco):
 def test_demonstrar_corrige_peca_flutuando(banco):
     blender = BlenderDemonstrar({"malhas": [PERNA_FLUTUANDO], "outros": []},
                                 {"malhas": [PERNA_NO_CHAO, TAMPO], "outros": []})
-    llm = LLMFalsa(mensagem("", codigo="caixa(1)"), mensagem("Mesa corrigida.", codigo="caixa(2)"))
+    llm = LLMFalsa(mensagem("", codigo="caixa('P', 1, 1, 1)"), mensagem("Mesa corrigida.", codigo="caixa('P', 2, 1, 1)"))
     ag = Agente(blender, None, banco, conversar=llm)
     resposta = ag.responder(novo_estado(banco, DEMONSTRAR), "crie uma mesa")
-    assert blender.executados == ["caixa(1)", "caixa(2)"] and blender.removidos == [set(), set()]
+    assert blender.executados == ["caixa('P', 1, 1, 1)", "caixa('P', 2, 1, 1)"] and blender.removidos == [set(), set()]
     assert "flutuando" in llm.chamadas[1]["mensagens"][-1]["content"]
     assert resposta.texto.startswith("Mesa corrigida.")
 
@@ -293,7 +293,7 @@ def test_demonstrar_corrige_peca_flutuando(banco):
 def test_demonstrar_desiste_depois_das_tentativas(banco):
     flutuando = {"malhas": [PERNA_FLUTUANDO], "outros": []}
     blender = BlenderDemonstrar(*[flutuando] * 3)
-    llm = LLMFalsa(*[mensagem("", codigo=f"caixa({i})") for i in range(3)])
+    llm = LLMFalsa(*[mensagem("", codigo=f"caixa('P', {i}, 1, 1)") for i in range(3)])
     ag = Agente(blender, None, banco, conversar=llm)
     resposta = ag.responder(novo_estado(banco, DEMONSTRAR), "crie uma mesa")
     assert len(blender.executados) == 3 and "tentativas" in resposta.texto
@@ -301,10 +301,10 @@ def test_demonstrar_desiste_depois_das_tentativas(banco):
 
 def test_demonstrar_recusa_codigo_sem_as_funcoes_prontas(banco):
     blender = BlenderDemonstrar({"malhas": [PERNA_NO_CHAO, TAMPO], "outros": []})
-    llm = LLMFalsa(mensagem("", codigo="bpy.ops.mesh.primitive_cube_add()"), mensagem("Mesa.", codigo="caixa(1)"))
+    llm = LLMFalsa(mensagem("", codigo="bpy.ops.mesh.primitive_cube_add()"), mensagem("Mesa.", codigo="caixa('P', 1, 1, 1)"))
     ag = Agente(blender, None, banco, conversar=llm)
     ag.responder(novo_estado(banco, DEMONSTRAR), "crie uma mesa")
-    assert blender.executados == ["caixa(1)"]
+    assert blender.executados == ["caixa('P', 1, 1, 1)"]
     assert "caixa()" in llm.chamadas[1]["mensagens"][-1]["content"]
 
 
@@ -322,7 +322,7 @@ def test_experimento_modelia_usa_o_demonstrar_com_a_mesma_seed(banco):
     mesa = {"malhas": [PERNA_NO_CHAO, TAMPO], "outros": []}
     blender = BlenderDemonstrar(mesa, mesa)
     blender.abrir_cena = lambda caminho: None
-    llm = LLMFalsa(mensagem("Mesa pronta.", codigo="caixa(1)"))
+    llm = LLMFalsa(mensagem("Mesa pronta.", codigo="caixa('P', 1, 1, 1)"))
     opcoes_vistas = []
     def conversar(modelo, mensagens, ferramentas=None, opcoes=None):
         opcoes_vistas.append(opcoes)
@@ -330,7 +330,7 @@ def test_experimento_modelia_usa_o_demonstrar_com_a_mesma_seed(banco):
 
     linha = experimento.executar_uma(blender, "falso", tarefas.TAREFAS["mesa"], 7, 0.3,
                                      experimento.MODELIA, banco, conversar)
-    assert linha["condicao"] == "modelia" and linha["codigo_gerado"] == "caixa(1)"
+    assert linha["condicao"] == "modelia" and linha["codigo_gerado"] == "caixa('P', 1, 1, 1)"
     assert linha["chamadas_ferramenta"] == 1 and linha["erros_execucao"] == 0
     assert opcoes_vistas[0]["seed"] == 7 and opcoes_vistas[0]["temperature"] == 0.3
     assert "Pedido:" in llm.chamadas[0]["mensagens"][1]["content"]  # prompt do Demonstrar, não o puro
@@ -383,15 +383,15 @@ def test_ensinar_aceita_codigo_escrito_no_texto(banco):
 
 def test_demonstrar_aceita_codigo_escrito_no_texto(banco):
     blender = BlenderDemonstrar({"malhas": [PERNA_NO_CHAO, TAMPO], "outros": []})
-    ag = Agente(blender, None, banco, conversar=LLMFalsa(mensagem("Mesa:\n```python\ncaixa(1)\n```")))
+    ag = Agente(blender, None, banco, conversar=LLMFalsa(mensagem("Mesa:\n```python\ncaixa('P', 1, 1, 1)\n```")))
     resposta = ag.responder(novo_estado(banco, DEMONSTRAR), "crie uma mesa")
-    assert blender.executados == ["caixa(1)"] and resposta.atualizar_cena
+    assert blender.executados == ["caixa('P', 1, 1, 1)"] and resposta.atualizar_cena
     assert "```" not in resposta.texto and resposta.texto.startswith("Mesa:")
 
 
 def test_demonstrar_nao_mostra_o_codigo_repetido_no_texto(banco):
     blender = BlenderDemonstrar({"malhas": [PERNA_NO_CHAO, TAMPO], "outros": []})
-    llm = LLMFalsa(mensagem("Vou criar a mesa.\n```python\ncaixa(1)\n```", codigo="caixa(1)"))
+    llm = LLMFalsa(mensagem("Vou criar a mesa.\n```python\ncaixa('P', 1, 1, 1)\n```", codigo="caixa('P', 1, 1, 1)"))
     resposta = Agente(blender, None, banco, conversar=llm).responder(novo_estado(banco, DEMONSTRAR), "mesa")
     assert "```" not in resposta.texto and resposta.texto.startswith("Vou criar a mesa.")
 
@@ -412,9 +412,31 @@ def test_streaming_passa_o_texto_para_quem_pediu(banco):
 def test_demonstrar_avisa_as_etapas(banco):
     blender = BlenderDemonstrar({"malhas": [PERNA_FLUTUANDO], "outros": []},
                                 {"malhas": [PERNA_NO_CHAO, TAMPO], "outros": []})
-    llm = LLMFalsa(mensagem("", codigo="caixa(1)"), mensagem("Mesa.", codigo="caixa(2)"))
+    llm = LLMFalsa(mensagem("", codigo="caixa('P', 1, 1, 1)"), mensagem("Mesa.", codigo="caixa('P', 2, 1, 1)"))
     etapas = []
     Agente(blender, None, banco, conversar=llm).responder(
         novo_estado(banco, DEMONSTRAR), "crie uma mesa", ao_avisar=etapas.append)
     assert etapas == ["Planejando as peças…", "Criando no Blender…", "Conferindo a cena…",
                       "Corrigindo o objeto (tentativa 2 de 3)…", "Criando no Blender…", "Conferindo a cena…"]
+
+
+def test_validar_acha_parametros_errados_antes_do_blender():
+    oculos = ("caixa('Lente', 0.04, 0.03, 0.01, x=-0.02, achatar=0.95)\n"  # caixa não tem achatar
+              "esfera('Ponte')\n"                                           # falta o raio
+              "cilindro('Haste', 0.003, 0.14, eixo='y')\n"                  # certo
+              "cone('C', 1, 2, 0, 0, 0, '#fff', 0, 9)\n")                   # valores demais
+    problemas = agente.validar(oculos)
+    assert len(problemas) == 3
+    assert "achatar não existe" in problemas[0] and "Linha 2, esfera(): falta raio" in problemas[1]
+    assert "no máximo 8" in problemas[2]
+    assert agente.validar("caixa('A', 1, 1, 1)\nwith ao_lado(0.5):\n    esfera('B', 0.1, achatar=0.5)") == []
+    assert agente.validar("caixa('A', 1,")[0].startswith("Erro de sintaxe na linha 1")
+
+
+def test_demonstrar_nao_manda_codigo_invalido_ao_blender(banco):
+    blender = BlenderDemonstrar({"malhas": [PERNA_NO_CHAO, TAMPO], "outros": []})
+    llm = LLMFalsa(mensagem("", codigo="caixa('A', 1, 1, 1, achatar=0.9)"), mensagem("Mesa.", codigo="caixa('P', 1, 1, 1)"))
+    ag = Agente(blender, None, banco, conversar=llm)
+    ag.responder(novo_estado(banco, DEMONSTRAR), "crie uma mesa")
+    assert blender.executados == ["caixa('P', 1, 1, 1)"]
+    assert "achatar não existe" in llm.chamadas[1]["mensagens"][-1]["content"]
