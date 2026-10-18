@@ -28,8 +28,11 @@ class LLMFalsa:
         self.chamadas = []
 
     def __call__(self, modelo, mensagens, ferramentas=None, opcoes=None):
+        # Chamadas auxiliares respondem fora da fila, para não mudar os outros testes.
         if mensagens[0]["content"] == agente.SISTEMA_BUSCA:
-            return mensagem("Termos do Blender")  # reescrita da busca: fora da fila, para não mudar os testes
+            return mensagem("Termos do Blender")
+        if mensagens[0]["content"] == agente.SISTEMA_TIPO:
+            return mensagem("TAREFA")
         nomes = {f["function"]["name"] for f in ferramentas or []}
         self.chamadas.append({"mensagens": list(mensagens), "ferramentas": nomes})
         return self.fila.pop(0)
@@ -468,3 +471,27 @@ def test_explicar_busca_com_os_termos_do_blender(banco):
     Agente(None, Conhecimento([]), banco, conversar=llm("FORA")).responder(
         novo_estado(banco, EXPLICAR), "capital da França?")
     assert buscas == ["como aumento o objeto?\nEscala (Scale), atalho S", "capital da França?"]
+
+
+def test_duvida_no_ensinar_responde_com_o_manual(banco):
+    def llm(modelo, mensagens, ferramentas=None, opcoes=None):
+        if mensagens[0]["content"] == agente.SISTEMA_TIPO:
+            return mensagem("DUVIDA")
+        return mensagem("Aperte S para mudar a escala.")
+
+    blender = BlenderFalso()
+    trechos = [{"titulo": "Escala", "fonte": "manual", "texto": "S muda a escala"}]
+    estado = novo_estado(banco, ENSINAR)
+    resposta = Agente(blender, ConhecimentoFalso(trechos), banco, conversar=llm).responder(
+        estado, "como funciona aumentar e diminuir objeto?")
+    assert "parece uma dúvida" in resposta.texto and "Aperte S" in resposta.texto and "Fontes" in resposta.texto
+    assert resposta.codigo == "" and blender.executados == [] and not estado.em_ensino
+
+
+def test_codigo_solto_sem_bloco_tambem_vale():
+    texto = ("Vou criar a base.\nPasso 1, code:\nimport bpy\nbpy.ops.mesh.primitive_plane_add(size=2)\n"
+             "Depois aperte S para escalar.")
+    codigo, explicacao = agente.codigo_no_texto(texto)
+    assert codigo == "import bpy\nbpy.ops.mesh.primitive_plane_add(size=2)"
+    assert explicacao == "Vou criar a base.\nPasso 1, code:"
+    assert agente.codigo_no_texto("Use import bpy no começo.") == (None, "Use import bpy no começo.")

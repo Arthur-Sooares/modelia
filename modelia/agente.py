@@ -48,6 +48,17 @@ SISTEMA_BUSCA = (
     "\"como faço um buraco num cubo usando outro\" -> Modificador Booleano (Boolean), diferença\n"
     "Responda só com a busca, numa linha, sem explicar. Se a dúvida não for sobre o Blender, responda só FORA.")
 
+# Medido em 18/10/2026 com o qwen3.5:4b: 14 de 15 frases certas; o erro ("como entrar no mode edicao"
+# saiu TAREFA) cai no lado seguro, que é o Ensinar de antes.
+SISTEMA_TIPO = (
+    "O aluno escreveu no modo Ensinar do Modelia, que ensina fazendo: o Modelia executa no Blender, passo a passo, "
+    "uma tarefa de modelagem.\n"
+    "TAREFA: a mensagem cita um objeto ou resultado para construir ou mudar na cena (mesa, cubo, luz, cadeira, "
+    "\"deixar o cubo maior\"), mesmo em forma de pergunta. Ex.: \"como faço uma estante?\" -> TAREFA\n"
+    "DUVIDA: a mensagem quer entender uma ferramenta, comando, modo ou atalho, sem um objeto para construir. "
+    "Ex.: \"como funciona a ferramenta de girar?\" -> DUVIDA; \"como eu uso o modo escultura?\" -> DUVIDA\n"
+    "Responda só uma palavra: TAREFA ou DUVIDA.")
+
 SISTEMA_EXPLICAR = BASE + (
     " Responda à dúvida usando SOMENTE os trechos do material que vêm na mensagem. "
     "Não invente e não use o que você sabe de fora do material. "
@@ -306,6 +317,15 @@ class Agente:
         busca = busca.strip().splitlines()[0] if busca.strip() else ""
         return "" if "FORA" in busca else busca
 
+    def _e_duvida(self, estado, mensagem):
+        """No Ensinar: a mensagem é uma dúvida (DUVIDA) em vez de uma tarefa para construir? Erro = tarefa."""
+        try:
+            tipo = self.conversar(estado.modelo, [{"role": "system", "content": SISTEMA_TIPO},
+                                                  {"role": "user", "content": mensagem}]).message.content or ""
+        except Exception:
+            return False
+        return "DUVIDA" in tipo.upper() and "TAREFA" not in tipo.upper()
+
     def _explicar(self, estado, pergunta):
         self._etapa("Procurando no manual…")
         termos = self._termos_do_blender(estado, pergunta)
@@ -485,6 +505,14 @@ class Agente:
             texto = "Tarefa encerrada. A cena ficou como estava."
             self._anotar(estado, texto)
             return Resposta(texto)
+
+        if not estado.em_ensino and self.conhecimento is not None and self._e_duvida(estado, mensagem):
+            # Dúvida no Ensinar virava um passo sem sentido; responde com o manual e mostra o modo certo.
+            resposta = self._explicar(estado, mensagem)
+            resposta.texto = ("*Isso parece uma dúvida, então respondi com o manual, como no modo **Explicar**. "
+                              "No Ensinar, peça uma tarefa, por exemplo “me ensina a fazer uma mesa”.*\n\n"
+                              + resposta.texto)
+            return resposta
 
         if not self.blender.disponivel():
             texto = ("O Blender não está conectado. Abra o Blender 5.1 e ligue o add-on MCP "
@@ -719,9 +747,20 @@ BLOCO_PYTHON = re.compile(r"```(?:python|py)[ \t]*\r?\n(.*?)```", re.DOTALL | re
 def codigo_no_texto(texto):
     """Separa o primeiro bloco ```python do texto: (código, texto sem o bloco) ou (None, texto)."""
     achado = BLOCO_PYTHON.search(texto)
-    if not achado:
-        return None, texto.strip()
-    return achado.group(1).strip(), (texto[:achado.start()] + texto[achado.end():]).strip()
+    if achado:
+        return achado.group(1).strip(), (texto[:achado.start()] + texto[achado.end():]).strip()
+    # O qwen3.5:4b às vezes escreve o código solto, sem ``` ("Passo 1, code:\nimport bpy..."): pega de
+    # "import bpy" em diante e tira as linhas do fim até compilar (texto que veio depois do código).
+    solto = re.search(r"^import bpy\b.*", texto, re.S | re.M)
+    if solto:
+        linhas = solto.group(0).splitlines()
+        while linhas:
+            try:
+                ast.parse("\n".join(linhas))
+                return "\n".join(linhas).strip(), texto[:solto.start()].strip()
+            except SyntaxError:
+                linhas.pop()
+    return None, texto.strip()
 
 
 def mensagem_de_erro(saida):
