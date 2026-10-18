@@ -28,6 +28,8 @@ class LLMFalsa:
         self.chamadas = []
 
     def __call__(self, modelo, mensagens, ferramentas=None, opcoes=None):
+        if mensagens[0]["content"] == agente.SISTEMA_BUSCA:
+            return mensagem("Termos do Blender")  # reescrita da busca: fora da fila, para não mudar os testes
         nomes = {f["function"]["name"] for f in ferramentas or []}
         self.chamadas.append({"mensagens": list(mensagens), "ferramentas": nomes})
         return self.fila.pop(0)
@@ -443,3 +445,23 @@ def test_demonstrar_nao_manda_codigo_invalido_ao_blender(banco):
     ag.responder(novo_estado(banco, DEMONSTRAR), "crie uma mesa")
     assert blender.executados == ["caixa('P', 1, 1, 1)"]
     assert "achatar não existe" in llm.chamadas[1]["mensagens"][-1]["content"]
+
+
+def test_explicar_busca_com_os_termos_do_blender(banco):
+    buscas = []
+
+    class Conhecimento(ConhecimentoFalso):
+        def buscar(self, pergunta):
+            buscas.append(pergunta)
+            return []
+
+    def llm(reescrita):
+        def conversar(modelo, mensagens, ferramentas=None, opcoes=None):
+            return mensagem(reescrita)
+        return conversar
+
+    Agente(None, Conhecimento([]), banco, conversar=llm("Escala (Scale), atalho S")).responder(
+        novo_estado(banco, EXPLICAR), "como aumento o objeto?")
+    Agente(None, Conhecimento([]), banco, conversar=llm("FORA")).responder(
+        novo_estado(banco, EXPLICAR), "capital da França?")
+    assert buscas == ["como aumento o objeto?\nEscala (Scale), atalho S", "capital da França?"]

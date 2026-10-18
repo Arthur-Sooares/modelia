@@ -36,6 +36,18 @@ BASE = (
     "Responda sempre em português do Brasil, com frases curtas e palavras simples."
 )
 
+# Medido em 18/10/2026 com o qwen3.5:4b: "aumentar e diminuir objeto" passou a achar "Escala",
+# "arredondar as quinas" achou "Chanfro", "copio um objeto" achou "Duplicar" (sem a reescrita, erravam).
+SISTEMA_BUSCA = (
+    "Você transforma a dúvida de um aluno iniciante em uma busca no manual do Blender.\n"
+    "Pense em qual ferramenta ou comando do Blender faz o que o aluno descreveu. Corrija os erros de digitação "
+    "e escreva o nome oficial da ferramenta em português e em inglês, com o atalho de teclado se houver.\n"
+    "Exemplos:\n"
+    "\"como puxo uma face pra fora\" -> Extrusão (Extrude), atalho E, modo de edição\n"
+    "\"como giro o objeto de lado\" -> Rotação (Rotate) de objeto, atalho R\n"
+    "\"como faço um buraco num cubo usando outro\" -> Modificador Booleano (Boolean), diferença\n"
+    "Responda só com a busca, numa linha, sem explicar. Se a dúvida não for sobre o Blender, responda só FORA.")
+
 SISTEMA_EXPLICAR = BASE + (
     " Responda à dúvida usando SOMENTE os trechos do material que vêm na mensagem. "
     "Não invente e não use o que você sabe de fora do material. "
@@ -273,9 +285,22 @@ class Agente:
 
     # --- RF4: Explicar ---
 
-    def _explicar(self, estado, pergunta):
+    def _termos_do_blender(self, estado, pergunta):
+        """Reescreve a dúvida com os nomes oficiais das ferramentas (query rewriting). O aluno diz
+        "aumentar o objeto"; o manual diz "Escala". Vazio quando não ajuda: aí busca só a pergunta."""
         try:
-            trechos = self.conhecimento.buscar(pergunta)
+            busca = self.conversar(estado.modelo, [{"role": "system", "content": SISTEMA_BUSCA},
+                                                   {"role": "user", "content": pergunta}]).message.content or ""
+        except Exception:
+            return ""
+        busca = busca.strip().splitlines()[0] if busca.strip() else ""
+        return "" if "FORA" in busca else busca
+
+    def _explicar(self, estado, pergunta):
+        self._etapa("Procurando no manual…")
+        termos = self._termos_do_blender(estado, pergunta)
+        try:
+            trechos = self.conhecimento.buscar(f"{pergunta}\n{termos}" if termos else pergunta)
         except Exception as erro:
             texto = f"Não consegui consultar a base de conhecimento ({erro})."
             self._anotar(estado, texto)
@@ -286,7 +311,8 @@ class Agente:
         contexto = "\n\n".join(f"[{i}] ({t['titulo']})\n{t['texto']}" for i, t in enumerate(trechos, 1))
         estado.mensagens = [
             {"role": "system", "content": SISTEMA_EXPLICAR},
-            {"role": "user", "content": f"Trechos do material:\n{contexto}\n\nDúvida do aluno: {pergunta}"},
+            {"role": "user", "content": f"Trechos do material:\n{contexto}\n\nDúvida do aluno: {pergunta}"
+                                        + (f"\n(No Blender, isso se chama: {termos})" if termos else "")},
         ]
         # Neste modo a LLM não recebe nenhuma ferramenta (RF4).
         resposta = self._falar(estado).message.content or ""
