@@ -407,3 +407,14 @@ def test_streaming_passa_o_texto_para_quem_pediu(banco):
                 banco, conversar=llm)
     ag.responder(novo_estado(banco, EXPLICAR), "como movo?", ao_escrever=vistos.append)
     assert vistos == ["Use G para mover."] and ag._ao_escrever is None
+
+
+def test_demonstrar_avisa_as_etapas(banco):
+    blender = BlenderDemonstrar({"malhas": [PERNA_FLUTUANDO], "outros": []},
+                                {"malhas": [PERNA_NO_CHAO, TAMPO], "outros": []})
+    llm = LLMFalsa(mensagem("", codigo="caixa(1)"), mensagem("Mesa.", codigo="caixa(2)"))
+    etapas = []
+    Agente(blender, None, banco, conversar=llm).responder(
+        novo_estado(banco, DEMONSTRAR), "crie uma mesa", ao_avisar=etapas.append)
+    assert etapas == ["Planejando as peças…", "Criando no Blender…", "Conferindo a cena…",
+                      "Corrigindo o objeto (tentativa 2 de 3)…", "Criando no Blender…", "Conferindo a cena…"]

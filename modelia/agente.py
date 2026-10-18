@@ -197,14 +197,15 @@ def na_fila(metodo):
     """Um pedido por vez. Dois pedidos juntos dividiriam a LLM e mexeriam na mesma cena:
     uma nova tentativa do Demonstrar apagaria os objetos que o outro pedido acabou de criar."""
     @functools.wraps(metodo)
-    def na_vez(self, *args, ao_escrever=None, **kwargs):
+    def na_vez(self, *args, ao_escrever=None, ao_avisar=None, **kwargs):
         # ao_escrever: recebe o texto da LLM enquanto ela escreve (streaming no chat).
+        # ao_avisar: recebe a etapa atual ("Criando no Blender…") enquanto o aluno espera.
         with self._fila:
-            self._ao_escrever = ao_escrever
+            self._ao_escrever, self._ao_avisar = ao_escrever, ao_avisar
             try:
                 return metodo(self, *args, **kwargs)
             finally:
-                self._ao_escrever = None
+                self._ao_escrever = self._ao_avisar = None
     return na_vez
 
 
@@ -216,7 +217,11 @@ class Agente:
         self.conversar = conversar
         # ponytail: fila única para todos os alunos; serve a um PC por aluno, como no laboratório.
         self._fila = threading.RLock()
-        self._ao_escrever = None
+        self._ao_escrever = self._ao_avisar = None
+
+    def _etapa(self, texto):
+        if self._ao_avisar:
+            self._ao_avisar(texto)
 
     def _falar(self, estado, ferramentas=None):
         """Uma rodada com a LLM; com streaming quando quem pediu quer ver o texto chegando."""
@@ -366,6 +371,8 @@ class Agente:
         ]
         ferramentas = self.blender.ferramentas({FERRAMENTA_EXECUTAR})
         for tentativa in range(1, config.MAX_TENTATIVAS + 1):
+            self._etapa("Planejando as peças…" if tentativa == 1 else
+                        f"Corrigindo o objeto (tentativa {tentativa} de {config.MAX_TENTATIVAS})…")
             mensagem = self._falar(estado, ferramentas).message
             estado.mensagens.append(mensagem)
             codigo = next((str(c.function.arguments.get("code", "")) for c in mensagem.tool_calls or []
@@ -390,6 +397,7 @@ class Agente:
             try:
                 # Cada pedido (e cada tentativa) recria o objeto inteiro numa cena vazia; sem isso
                 # o objeto novo nasce por cima do anterior.
+                self._etapa("Criando no Blender…")
                 self.blender.remover_malhas_exceto(set())
                 saida, erro = self.blender.executar_com_ajudantes(sem_redefinicoes(codigo))
             except Exception as falha:
@@ -399,6 +407,7 @@ class Agente:
                 estado.interacao["erros"] += 1
                 retorno = f"ERRO do Blender: {mensagem_de_erro(saida)}\nMande o código completo corrigido."
             else:
+                self._etapa("Conferindo a cena…")
                 problemas = problemas_da_cena(self.blender.medir_cena())
                 if not problemas:
                     texto = resumo or "Pronto, o objeto foi criado."

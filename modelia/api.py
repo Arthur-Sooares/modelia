@@ -58,12 +58,13 @@ def criar_api(s):
 
     def responder(funcao, *args):
         """Roda o agente numa thread e manda uma linha JSON por pedaço (NDJSON):
-        {"parcial": texto até agora}, ..., e por último {"fim": resposta} ou {"erro": mensagem}."""
+        {"parcial": texto até agora} e {"etapa": o que o agente está fazendo}, ..., e por último {"fim": resposta} ou {"erro": mensagem}."""
         fila = queue.Queue()
 
         def trabalhar():
             try:
-                fila.put({"fim": para_json(funcao(*args, ao_escrever=lambda texto: fila.put({"parcial": texto})))})
+                fila.put({"fim": para_json(funcao(*args, ao_escrever=lambda texto: fila.put({"parcial": texto}),
+                                                  ao_avisar=lambda etapa: fila.put({"etapa": etapa})))})
             except Exception as erro:
                 fila.put({"erro": f"Algo deu errado: {erro}"})
 
@@ -73,7 +74,7 @@ def criar_api(s):
             while True:
                 item = fila.get()
                 yield json.dumps(item, ensure_ascii=False) + "\n"
-                if "parcial" not in item:
+                if "fim" in item or "erro" in item:
                     return
 
         return StreamingResponse(linhas(), media_type="application/x-ndjson")

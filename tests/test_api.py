@@ -15,7 +15,8 @@ class AgenteFalso:
     def __init__(self):
         self.trocas = []
 
-    def responder(self, estado, mensagem, tarefa_id="", ao_escrever=None):
+    def responder(self, estado, mensagem, tarefa_id="", ao_escrever=None, ao_avisar=None):
+        ao_avisar("Planejando")
         ao_escrever("pensando...")
         return Resposta(f"{estado.modo}: {mensagem} ({estado.modelo})", detalhes={"tarefa": tarefa_id} or None)
 
@@ -41,7 +42,7 @@ def test_conversa_troca_de_modo_e_responde(tmp_path):
     conversa = c.post("/api/conversas").json()["conversa"]
     r = c.post("/api/mensagem", json={"conversa": conversa, "texto": "oi", "modo": EXPLICAR, "modelo": "m1"})
     assert r.status_code == 200 and linhas(r) == [
-        {"parcial": "pensando..."},
+        {"etapa": "Planejando"}, {"parcial": "pensando..."},
         {"fim": {"texto": "Explicar: oi (m1)", "codigo": "", "atualizar_cena": False, "detalhes": {"tarefa": ""}}}]
     r = c.post("/api/mensagem", json={"conversa": conversa, "texto": "certo?", "modo": VERIFICAR, "tarefa": "mesa"})
     assert linhas(r)[-1]["fim"]["detalhes"] == {"tarefa": "mesa"} and s.agente.trocas == [VERIFICAR]  # modelo m1 continua
