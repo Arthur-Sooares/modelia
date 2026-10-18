@@ -16,7 +16,8 @@ BANCO = PASTA_DADOS / "modelia.sqlite3"
 PASTA_INDICE = PASTA_DADOS / "chroma"
 
 # RNF1 e RNF2: só no endereço local, sem compartilhamento público.
-HOST = "127.0.0.1"
+# Para abrir no celular na mesma rede Wi-Fi: MODELIA_HOST=0.0.0.0 (qualquer um na rede acessa).
+HOST = os.environ.get("MODELIA_HOST", "127.0.0.1")
 PORTA = 7860
 
 # RNF3: LLM local pelo Ollama.
