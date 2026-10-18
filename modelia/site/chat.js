@@ -260,6 +260,12 @@ async function enviar(texto) {
       return;
     }
   }
+  // Mensagem nova cancela o código que esperava o clique (o servidor faz o mesmo).
+  for (const el of atual.elemento.querySelectorAll(".codigo:not(.feito)")) {
+    el.classList.add("feito");
+    el.querySelectorAll("button").forEach((b) => { b.disabled = true; });
+    el.querySelector(".codigo-topo span").textContent = "Não executado";
+  }
   if (!atual.titulo) registrarNoHoje(texto);
   $("#boas-vindas").hidden = true;
   adicionarAluno(texto);

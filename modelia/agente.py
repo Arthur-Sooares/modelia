@@ -263,10 +263,20 @@ class Agente:
         mensagem = (mensagem or "").strip()
         if not mensagem:
             return Resposta("Escreva uma mensagem.")
+        aviso = ""
         if estado.pendente:
-            return Resposta("Antes de continuar, clique em **Executar** ou **Cancelar** no código proposto.",
-                            codigo=estado.pendente["codigo"])
+            # Escrever outra coisa vale como Cancelar: o código não roda sem o clique (RF6), mas o chat não trava.
+            self._cancelar_pendente(estado, "O aluno escreveu outra mensagem sem executar o código. "
+                                            "Ele NÃO foi executado e a cena não mudou.")
+            aviso = "*O código anterior não foi executado.*\n\n"
         self._abrir_interacao(estado, mensagem)
+        if aviso:
+            resposta = self._responder_no_modo(estado, mensagem, tarefa_id)
+            resposta.texto = aviso + resposta.texto
+            return resposta
+        return self._responder_no_modo(estado, mensagem, tarefa_id)
+
+    def _responder_no_modo(self, estado, mensagem, tarefa_id):
         if estado.modo == EXPLICAR:
             return self._explicar(estado, mensagem)
         if estado.modo == VERIFICAR:
@@ -577,15 +587,18 @@ class Agente:
     @na_fila
     def cancelar(self, estado):
         """Clique em "Cancelar" (RF6): nada é executado e a LLM fica sabendo."""
-        pendente, estado.pendente = estado.pendente, None
-        if not pendente:
+        if not estado.pendente:
             return Resposta("Não há código esperando confirmação.")
-        self.banco.registrar_codigo(pendente["interacao"], pendente["codigo"], "cancelado")
-        estado.mensagens.append({"role": "tool", "tool_name": FERRAMENTA_EXECUTAR,
-                                 "content": "O aluno cancelou. O código NÃO foi executado e a cena não mudou."})
-        self._anotar(estado, "[cancelado]")
+        self._cancelar_pendente(estado, "O aluno cancelou. O código NÃO foi executado e a cena não mudou.")
         return Resposta("Cancelado: nada foi executado. Escreva **próximo** para a LLM propor outro "
                         "caminho, dê uma instrução diferente ou escreva **parar**.")
+
+    def _cancelar_pendente(self, estado, aviso_para_llm):
+        """Descarta o código que esperava o clique, registra no banco e avisa a LLM."""
+        pendente, estado.pendente = estado.pendente, None
+        self.banco.registrar_codigo(pendente["interacao"], pendente["codigo"], "cancelado")
+        estado.mensagens.append({"role": "tool", "tool_name": FERRAMENTA_EXECUTAR, "content": aviso_para_llm})
+        self._anotar(estado, "[cancelado]")
 
 
 def com_explicacao(ferramentas):

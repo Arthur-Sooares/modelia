@@ -140,13 +140,16 @@ def test_erro_volta_para_a_llm_ate_o_limite(banco, monkeypatch):
     assert "parei" in resposta.texto
 
 
-def test_digitar_com_codigo_pendente_pede_o_clique(banco):
-    llm = LLMFalsa(mensagem("p", codigo="c1"))
-    ag = Agente(BlenderFalso(), None, banco, conversar=llm)
+def test_digitar_com_codigo_pendente_cancela_o_codigo(banco):
+    blender = BlenderFalso()
+    llm = LLMFalsa(mensagem("p", codigo="c1"), mensagem("Outro caminho.", codigo="c2"))
+    ag = Agente(blender, None, banco, conversar=llm)
     estado = novo_estado(banco, ENSINAR)
     ag.responder(estado, "faça um cubo")
-    resposta = ag.responder(estado, "e agora?")
-    assert "Executar" in resposta.texto and len(llm.chamadas) == 1
+    resposta = ag.responder(estado, "faz uma esfera em vez disso")
+    assert resposta.texto.startswith("*O código anterior não foi executado.*") and resposta.codigo == "c2"
+    assert blender.executados == []  # c1 nunca rodou (RF6)
+    assert "NÃO foi executado" in llm.chamadas[1]["mensagens"][-2]["content"]
 
 
 def test_parar_encerra_a_demonstracao(banco):
