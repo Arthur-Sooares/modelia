@@ -51,24 +51,46 @@ def apagar(nome):
     cliente.delete(nome)
 
 
-def conversar(modelo, mensagens, ferramentas=None, opcoes=None):
-    """Uma rodada de conversa. Desliga o modo "pensar" quando o modelo aceita (fica mais rápido)."""
+def conversar(modelo, mensagens, ferramentas=None, opcoes=None, ao_escrever=None):
+    """Uma rodada de conversa. Desliga o modo "pensar" quando o modelo aceita (fica mais rápido).
+
+    Com `ao_escrever`, a resposta vem aos pedaços (streaming): a função recebe o texto escrito
+    até agora a cada pedaço, e no fim volta a mesma resposta completa de sempre."""
     opcoes = dict(opcoes or config.OPCOES_LLM)
     if modelo in config.CAMADAS_GPU:
         opcoes["num_gpu"] = config.CAMADAS_GPU[modelo]
     argumentos = {"model": modelo, "messages": mensagens, "options": opcoes}
     if ferramentas:
         argumentos["tools"] = ferramentas
+
+    def chamar(**extras):
+        if not ao_escrever:
+            return cliente.chat(**argumentos, **extras)
+        return juntar(cliente.chat(**argumentos, **extras, stream=True), ao_escrever)
+
     try:
-        return cliente.chat(think=False, **argumentos)
+        return chamar(think=False)
     except ollama.ResponseError as erro:
         if "num_gpu" in opcoes and erro.status_code == 500:
             # Outro programa (um jogo, o Blender) ocupou a VRAM e as camadas não couberam: o Ollama decide.
             argumentos["options"] = {k: v for k, v in opcoes.items() if k != "num_gpu"}
-            return cliente.chat(think=False, **argumentos)
+            return chamar(think=False)
         if "think" not in str(erro).lower():
             raise
-        return cliente.chat(**argumentos)
+        return chamar()
+
+
+def juntar(partes, ao_escrever):
+    """Junta os pedaços do streaming numa resposta só, avisando o texto a cada pedaço."""
+    texto, chamadas, ultima = "", [], None
+    for ultima in partes:
+        if ultima.message.content:
+            texto += ultima.message.content
+            ao_escrever(texto)
+        chamadas += ultima.message.tool_calls or []
+    ultima.message.content = texto
+    ultima.message.tool_calls = chamadas or None
+    return ultima
 
 
 def embeddings(textos):

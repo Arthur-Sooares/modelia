@@ -5,10 +5,13 @@ sessão própria no banco (RNF10). Ainda sem login: todas as conversas são do "
 """
 
 import io
+import json
+import queue
+import threading
 import uuid
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 from modelia import config, llm
@@ -54,12 +57,26 @@ def criar_api(s):
         return conversas[conversa]
 
     def responder(funcao, *args):
-        try:
-            return para_json(funcao(*args))
-        except HTTPException:
-            raise
-        except Exception as erro:
-            raise HTTPException(502, f"Algo deu errado: {erro}") from erro
+        """Roda o agente numa thread e manda uma linha JSON por pedaço (NDJSON):
+        {"parcial": texto até agora}, ..., e por último {"fim": resposta} ou {"erro": mensagem}."""
+        fila = queue.Queue()
+
+        def trabalhar():
+            try:
+                fila.put({"fim": para_json(funcao(*args, ao_escrever=lambda texto: fila.put({"parcial": texto})))})
+            except Exception as erro:
+                fila.put({"erro": f"Algo deu errado: {erro}"})
+
+        threading.Thread(target=trabalhar, daemon=True).start()
+
+        def linhas():
+            while True:
+                item = fila.get()
+                yield json.dumps(item, ensure_ascii=False) + "\n"
+                if "parcial" not in item:
+                    return
+
+        return StreamingResponse(linhas(), media_type="application/x-ndjson")
 
     @api.get("/situacao")
     def situacao():

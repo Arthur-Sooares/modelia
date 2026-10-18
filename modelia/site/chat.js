@@ -30,6 +30,31 @@ async function api(caminho, corpo) {
   return dados;
 }
 
+// Respostas do agente chegam aos pedaços (NDJSON, uma linha JSON por pedaço): {"parcial"}..., {"fim"} ou {"erro"}.
+async function fluxo(caminho, corpo, aoParcial) {
+  const resposta = await fetch(caminho, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo),
+  });
+  if (!resposta.ok) {
+    const dados = await resposta.json().catch(() => ({}));
+    throw new Error(dados.detail || `Erro ${resposta.status}`);
+  }
+  const leitor = resposta.body.pipeThrough(new TextDecoderStream()).getReader();
+  let resto = "";
+  for (;;) {
+    const { value, done } = await leitor.read();
+    if (done) throw new Error("A conexão com o servidor caiu antes do fim da resposta.");
+    const linhas = (resto + value).split("\n");
+    resto = linhas.pop();
+    for (const linha of linhas.filter(Boolean)) {
+      const item = JSON.parse(linha);
+      if (item.erro) throw new Error(item.erro);
+      if (item.fim) return item.fim;
+      aoParcial(item.parcial);
+    }
+  }
+}
+
 async function situacao() {
   try {
     const s = await (await fetch("/api/situacao")).json();
@@ -119,6 +144,12 @@ function adicionarModelia() {
   return el.querySelector(".corpo");
 }
 
+function escrevendo(corpo, texto) {
+  const aberto = (texto.match(/```/g) || []).length % 2; // bloco de código ainda sendo escrito
+  corpo.replaceChildren(...blocos(aberto ? texto + "\n```" : texto));
+  rolar();
+}
+
 function pensando(corpo) {
   corpo.innerHTML = '<p class="pensando"><img class="pisca" src="img/pulso.svg" alt="">Pensando…</p>';
 }
@@ -150,7 +181,7 @@ function cartaoCodigo(codigo) {
     executar.disabled = cancelar.disabled = true;
     el.classList.add("feito");
     el.querySelector(".codigo-topo span").textContent = rotulo;
-    await pedir(() => api(`/api/${acao}`, { conversa: atual.id }));
+    await pedir((aoParcial) => fluxo(`/api/${acao}`, { conversa: atual.id }, aoParcial));
   };
   executar.addEventListener("click", () => decidir("executar", "Executado no Blender"));
   cancelar.addEventListener("click", () => decidir("cancelar", "Cancelado"));
@@ -192,7 +223,7 @@ async function pedir(chamada) {
   const corpo = adicionarModelia();
   pensando(corpo);
   try {
-    const r = await chamada();
+    const r = await chamada((texto) => escrevendo(corpo, texto));
     mostrarResposta(corpo, r, modoDoPedido);
     atual.emEnsino = modoDoPedido === "Ensinar" && (Boolean(r.codigo) || atual.emEnsino);
     $("#texto").placeholder = atual.emEnsino ? "Escreva “próximo” ou “parar”…" : PLACEHOLDER[modo];
@@ -221,9 +252,9 @@ async function enviar(texto) {
   if (!atual.titulo) registrarNoHoje(texto);
   $("#boas-vindas").hidden = true;
   adicionarAluno(texto);
-  await pedir(() => api("/api/mensagem", {
+  await pedir((aoParcial) => fluxo("/api/mensagem", {
     conversa: atual.id, texto, modo, modelo: $("#modelo").value, tarefa: modo === "Verificar" ? $("#tarefa").value : "",
-  }));
+  }, aoParcial));
 }
 
 // --- conversas da sessão (lista "Hoje") ---

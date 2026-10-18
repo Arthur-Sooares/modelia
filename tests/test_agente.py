@@ -394,3 +394,16 @@ def test_demonstrar_nao_mostra_o_codigo_repetido_no_texto(banco):
     llm = LLMFalsa(mensagem("Vou criar a mesa.\n```python\ncaixa(1)\n```", codigo="caixa(1)"))
     resposta = Agente(blender, None, banco, conversar=llm).responder(novo_estado(banco, DEMONSTRAR), "mesa")
     assert "```" not in resposta.texto and resposta.texto.startswith("Vou criar a mesa.")
+
+
+def test_streaming_passa_o_texto_para_quem_pediu(banco):
+    vistos = []
+
+    def llm(modelo, mensagens, ferramentas=None, opcoes=None, ao_escrever=None):
+        ao_escrever("Use G para mover.")
+        return mensagem("Use G para mover.")
+
+    ag = Agente(BlenderFalso(), ConhecimentoFalso([{"titulo": "Atalhos", "fonte": "", "texto": "G move"}]),
+                banco, conversar=llm)
+    ag.responder(novo_estado(banco, EXPLICAR), "como movo?", ao_escrever=vistos.append)
+    assert vistos == ["Use G para mover."] and ag._ao_escrever is None

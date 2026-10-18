@@ -197,9 +197,14 @@ def na_fila(metodo):
     """Um pedido por vez. Dois pedidos juntos dividiriam a LLM e mexeriam na mesma cena:
     uma nova tentativa do Demonstrar apagaria os objetos que o outro pedido acabou de criar."""
     @functools.wraps(metodo)
-    def na_vez(self, *args, **kwargs):
+    def na_vez(self, *args, ao_escrever=None, **kwargs):
+        # ao_escrever: recebe o texto da LLM enquanto ela escreve (streaming no chat).
         with self._fila:
-            return metodo(self, *args, **kwargs)
+            self._ao_escrever = ao_escrever
+            try:
+                return metodo(self, *args, **kwargs)
+            finally:
+                self._ao_escrever = None
     return na_vez
 
 
@@ -211,6 +216,12 @@ class Agente:
         self.conversar = conversar
         # ponytail: fila única para todos os alunos; serve a um PC por aluno, como no laboratório.
         self._fila = threading.RLock()
+        self._ao_escrever = None
+
+    def _falar(self, estado, ferramentas=None):
+        """Uma rodada com a LLM; com streaming quando quem pediu quer ver o texto chegando."""
+        extra = {"ao_escrever": self._ao_escrever} if self._ao_escrever else {}
+        return self.conversar(estado.modelo, estado.mensagens, ferramentas, **extra)
 
     # --- registro (RNF10) ---
 
@@ -273,7 +284,7 @@ class Agente:
             {"role": "user", "content": f"Trechos do material:\n{contexto}\n\nDúvida do aluno: {pergunta}"},
         ]
         # Neste modo a LLM não recebe nenhuma ferramenta (RF4).
-        resposta = self.conversar(estado.modelo, estado.mensagens).message.content or ""
+        resposta = self._falar(estado).message.content or ""
         if NAO_SEI in resposta:
             return self._nao_coberto(estado)
         fontes = sorted({f"{t['titulo']}" + (f" ({t['fonte']})" if t["fonte"] else "") for t in trechos})
@@ -325,7 +336,7 @@ class Agente:
     def _laco_leitura(self, estado, ferramentas):
         """Deixa a LLM usar ferramentas de leitura até ela responder com texto."""
         for _ in range(config.MAX_RODADAS):
-            mensagem = self.conversar(estado.modelo, estado.mensagens, ferramentas).message
+            mensagem = self._falar(estado, ferramentas).message
             estado.mensagens.append(mensagem)
             if not mensagem.tool_calls:
                 return (mensagem.content or "").strip()
@@ -355,7 +366,7 @@ class Agente:
         ]
         ferramentas = self.blender.ferramentas({FERRAMENTA_EXECUTAR})
         for tentativa in range(1, config.MAX_TENTATIVAS + 1):
-            mensagem = self.conversar(estado.modelo, estado.mensagens, ferramentas).message
+            mensagem = self._falar(estado, ferramentas).message
             estado.mensagens.append(mensagem)
             codigo = next((str(c.function.arguments.get("code", "")) for c in mensagem.tool_calls or []
                            if c.function.name == FERRAMENTA_EXECUTAR), None)
@@ -433,7 +444,7 @@ class Agente:
         """Roda a LLM até ela propor código (para e espera o clique) ou encerrar a tarefa."""
         ferramentas = com_explicacao(self.blender.ferramentas(FERRAMENTAS_LEITURA | {FERRAMENTA_EXECUTAR}))
         for _ in range(config.MAX_RODADAS):
-            mensagem = self.conversar(estado.modelo, estado.mensagens, ferramentas).message
+            mensagem = self._falar(estado, ferramentas).message
             estado.mensagens.append(mensagem)
             codigo, explicacao = None, ""
             if not mensagem.tool_calls:
