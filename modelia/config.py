@@ -28,9 +28,11 @@ OPCOES_LLM = {"temperature": 0.6, "num_ctx": 8192}
 # Carregar de novo custa ~1 min (medido em 18/10/2026 com o qwen3.5:4b).
 MANTER_CARREGADO = os.environ.get("MODELIA_MANTER_CARREGADO", "30m")
 # Camadas na GPU para modelos maiores que a placa (RTX 2060, 6 GB). O Ollama sozinho põe poucas.
-# Medido em 16/10/2026, com o Blender aberto: gemma4 com 42 camadas fez 5,9 tok/s e com o padrão fez 3,1.
-# Com todas as camadas fica mais lento, porque o Windows transborda a VRAM para a RAM.
-CAMADAS_GPU = {"gemma4:12b-it-qat": 42}
+# Com camadas demais fica mais lento, porque o Windows transborda a VRAM para a RAM.
+# Medido em 18/10/2026 com o Blender aberto (uv run python -m modelia.desempenho): gemma4 com 42 camadas
+# pedia 6,6 GB numa placa de 6,1 GB (transbordava) e gerava 3,7–4,2 tok/s; com 36 camadas cabe (5,8 GB)
+# e gera 4,8 tok/s. O qwen3.5:4b cabe inteiro na GPU sozinho (3,4 GB) e gera 73 tok/s.
+CAMADAS_GPU = {"gemma4:12b-it-qat": 36}
 VRAM_GB = float(os.environ.get("MODELIA_VRAM_GB", "6"))  # RNF7: máquina de referência
 
 # RNF8: servidor MCP oficial da Blender Lab, iniciado como subprocesso (stdio).
