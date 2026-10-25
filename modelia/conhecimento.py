@@ -6,6 +6,7 @@ O qwen3-embedding pede uma instrução antes da pergunta; os documentos vão sem
 
 import hashlib
 import re
+from datetime import date
 from pathlib import Path
 
 import chromadb
@@ -75,11 +76,12 @@ class Conhecimento:
         doc_id = hashlib.sha1(f"{titulo}|{fonte}".encode()).hexdigest()[:12]
         self.remover(doc_id)  # reenviar o mesmo documento substitui a versão antiga
         vetores = llm.embeddings(trechos)
+        adicionado = date.today().isoformat()
         self.colecao.add(
             ids=[f"{doc_id}-{i}" for i in range(len(trechos))],
             documents=trechos,
             embeddings=vetores,
-            metadatas=[{"doc_id": doc_id, "titulo": titulo, "fonte": fonte, "parte": i}
+            metadatas=[{"doc_id": doc_id, "titulo": titulo, "fonte": fonte, "parte": i, "adicionado": adicionado}
                        for i in range(len(trechos))],
         )
         return len(trechos)
@@ -89,7 +91,8 @@ class Conhecimento:
         documentos = {}
         for meta in self.colecao.get(include=["metadatas"])["metadatas"]:
             doc = documentos.setdefault(meta["doc_id"], {
-                "doc_id": meta["doc_id"], "titulo": meta["titulo"], "fonte": meta["fonte"], "trechos": 0})
+                "doc_id": meta["doc_id"], "titulo": meta["titulo"], "fonte": meta["fonte"], "trechos": 0,
+                "adicionado": meta.get("adicionado", "")})  # vazio nos indexados antes de 19/10/2026
             doc["trechos"] += 1
         return sorted(documentos.values(), key=lambda d: d["titulo"].lower())
 
