@@ -29,15 +29,25 @@ O gemma4 (`ollama pull gemma4:12b-it-qat`) só é necessário para o experimento
 $env:MODELIA_MODELO="qwen3.5:4b"; uv run main.py
 ```
 
-O navegador abre em http://127.0.0.1:7860. Clique em **Entrar** para ir ao chat.
+O navegador abre em http://127.0.0.1:7860. Clique em **Começar** para ir ao chat.
 
-As telas do pesquisador ficam em http://127.0.0.1:7860/app. Para entrar, use a senha da variável `MODELIA_SENHA` (padrão: `modelia`).
+Para os alunos, crie o atalho na tela **Instalação** (cartão "Atalho na área de trabalho"): dois cliques no ícone
+**Modelia** ligam o servidor sem janela de terminal (`modelia/atalho/abrir.vbs`) e mostram "Abrindo o Modelia…" até o
+chat ficar pronto. Se o computador ainda não estiver preparado, o chat mostra "Quase lá!" e pede para chamar o professor.
+
+As telas do pesquisador (Modelos, Conhecimento, Histórico, Experimento e Instalação) ficam em
+http://127.0.0.1:7860/pesquisador.html, sem senha. Para exigir uma senha (por exemplo, com o Modelia aberto na rede),
+defina a variável `MODELIA_SENHA`.
+Num computador novo, abra a tela **Instalação**: ela instala o Ollama, baixa os modelos e indexa o manual do Blender.
+O app antigo em Gradio continua em http://127.0.0.1:7860/app.
 
 ## Estrutura
 
 | Arquivo | O que faz | Requisitos |
 | --- | --- | --- |
 | `modelia/interface.py` | Telas e abas em Gradio | RF1 a RF10, RNF1, RNF2, RNF5, RNF6 |
+| `modelia/pesquisador.py` | API das telas do Pesquisador (`site/pesquisador.html`) | RF3, RF8, RF9, RF10 |
+| `modelia/preparar.py` | Instala o Ollama, baixa os modelos e o manual | |
 | `modelia/agente.py` | Orquestrador dos modos Explicar, Demonstrar e Verificar | RF4 a RF7 |
 | `modelia/blender.py` | Cliente MCP do Blender | RNF8 |
 | `modelia/llm.py` | Conversa com o Ollama e gerência de modelos | RF3, RNF3 |

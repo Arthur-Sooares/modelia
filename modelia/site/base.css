@@ -31,6 +31,11 @@
   --laranja: #ff6a13;
   --azul: #3d5afe;
   --verde: #1f9d55;
+  /* As cores da marca têm pouco contraste como texto pequeno sobre fundo claro (laranja 2,7:1, verde 3,0:1,
+     azul 4,2:1 nas pílulas). Para texto, usar estas versões escuras, que passam de 4,5:1 (WCAG AA). */
+  --laranja-texto: #b5470a;
+  --verde-texto: #17733e;
+  --azul-texto: #2f4ae0;
   --display: "Unbounded", system-ui, sans-serif;
   --corpo: "Host Grotesk", system-ui, sans-serif;
   --mono: "Martian Mono", ui-monospace, monospace;

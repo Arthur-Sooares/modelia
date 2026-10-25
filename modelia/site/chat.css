@@ -1,4 +1,5 @@
-/* Chat do Modelia: telas "3 · Chat (novo)" a "6 · Chat (Verificar)" do Figma (versão 2). */
+/* Chat do Modelia: telas "3 · Chat (novo)" a "6 · Chat (Verificar)" do Figma (versão 2) e
+   "Melhorias para o aluno (UX)": 13 a 13d (chat), 14 (Quase lá) e 0 (Abrindo o Modelia). */
 
 * { box-sizing: border-box; margin: 0; }
 html, body { height: 100%; }
@@ -6,11 +7,15 @@ body { display: flex; background: var(--fundo); color: var(--tinta); font-family
 img { display: block; }
 a { color: inherit; text-decoration: none; }
 button, select, textarea { font: inherit; color: inherit; }
-button { border: 0; background: none; cursor: pointer; }
+button { border: 0; background: none; cursor: pointer; touch-action: manipulation; }
 :focus-visible { outline: 2px solid var(--azul); outline-offset: 2px; border-radius: 10px; }
 [hidden] { display: none !important; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .laranja { color: var(--laranja); }
+/* atalho de teclado: aparece só ao receber o foco com Tab */
+.pular { position: fixed; left: 16px; top: 12px; z-index: 10; padding: 10px 18px; border-radius: 999px; background: var(--tinta); color: var(--cartao);
+  font-weight: 600; font-size: 14px; translate: 0 -200%; }
+.pular:focus-visible { translate: 0 0; }
 
 /* cor de cada modo: pílula ativa e texto sobre ela */
 [data-modo="Explicar"] { --cor-modo: var(--azul); --sobre-modo: #fff; }
@@ -29,12 +34,14 @@ button { border: 0; background: none; cursor: pointer; }
 .nova:hover { transform: translateY(-1px); }
 .nova:active { transform: scale(.98); }
 .grupo { display: flex; flex-direction: column; gap: 2px; }
-.grupo-titulo { font-weight: 600; font-size: 12px; color: #6b6c74; }
-.item { display: flex; gap: 10px; align-items: center; width: 100%; padding: 9px 10px; border-radius: 10px; font-size: 14px; color: var(--texto-2);
+.grupo-titulo { font-weight: 600; font-size: 12px; color: var(--texto-2); }
+.item { display: flex; gap: 10px; align-items: center; width: 100%; padding: 12.5px 10px; border-radius: 10px; font-size: 14px; color: var(--texto-2);
   text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background-color .15s; }
 .item:hover { background: #dfe1e6; }
 .item[aria-current="true"] { background: #dadde3; font-weight: 600; color: var(--tinta); }
 .espaco { flex: 1; }
+.professor { padding: 12px 10px; border-radius: 10px; font-weight: 500; font-size: 13px; color: var(--texto-2); }
+.professor:hover { color: var(--tinta); background: #dfe1e6; }
 .participante { display: flex; gap: 10px; align-items: center; padding: 10px; border-radius: 14px; background: var(--cartao); }
 .avatar { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 999px; background: var(--azul); color: #fff; font-weight: 600; font-size: 12px; }
 .participante-nome { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
@@ -45,6 +52,7 @@ button { border: 0; background: none; cursor: pointer; }
 /* --- área principal --- */
 .principal { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; }
 .barra { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 24px; }
+#botao-cena { margin-left: auto; }
 .menu { display: none; font-size: 20px; padding: 4px 8px; }
 .pilula { display: flex; gap: 8px; align-items: center; padding: 8px 14px; border-radius: 999px; background: var(--cartao); border: 1px solid var(--borda);
   font-weight: 600; font-size: 14px; white-space: nowrap; }
@@ -59,15 +67,18 @@ button { border: 0; background: none; cursor: pointer; }
 .boas-vindas { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 36px; padding: 24px 0; }
 .boas-vindas h1 { font-family: var(--display); font-weight: 900; font-size: 38px; letter-spacing: -.95px; text-align: center; text-wrap: balance; --dy: 24px; }
 .sugestoes { display: grid; grid-template-columns: repeat(2, minmax(0, 374px)); gap: 12px; }
-.sugestao { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; padding: 18px 20px; border-radius: 20px; text-align: left;
-  background: var(--cartao); border: 1px solid var(--borda); font-weight: 500; font-size: 16px; transition: border-color .15s, transform .15s; }
+.sugestao { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; padding: 20px; border-radius: 20px; text-align: left;
+  background: var(--cartao); border: 1px solid var(--borda); font-size: 14px; color: var(--texto-2); transition: border-color .15s, transform .15s; }
 .sugestao:hover { border-color: #b9bcc6; transform: translateY(-2px); }
-.sugestao-modo { display: flex; gap: 6px; align-items: center; font-weight: 600; font-size: 12px; color: var(--texto-2); }
+.sugestao-modo { display: flex; gap: 8px; align-items: center; font-weight: 600; font-size: 16px; color: var(--tinta); }
 
 /* --- mensagens --- */
 .msg-aluno { display: flex; justify-content: flex-end; }
 .msg-aluno p { max-width: 80%; padding: 12px 18px; border-radius: 22px; background: #dadde3; font-weight: 500; font-size: 16px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .msg-modelia { display: flex; gap: 14px; align-items: flex-start; }
+.coluna-modelia { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.tempo { font-family: var(--mono); font-size: 12px; color: #6b6c74; font-variant-numeric: tabular-nums; }
+.tempo.rodando { color: var(--texto-2); }
 .corpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; align-items: flex-start; font-size: 16px; line-height: 1.6; overflow-wrap: anywhere; }
 .corpo > p, .corpo > ul, .corpo > ol { width: 100%; }
 .corpo ul, .corpo ol { padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; line-height: normal; }
@@ -75,9 +86,9 @@ button { border: 0; background: none; cursor: pointer; }
 .corpo ol { counter-reset: passo; }
 .corpo ol li::before { counter-increment: passo; content: counter(passo) "."; font-weight: 600; color: var(--texto-2); }
 .tecla { display: inline-block; padding: 4px 9px; margin: 0 2px; border-radius: 8px; background: var(--fundo); border: 1px solid #b9bcc6;
-  font-family: var(--mono); font-weight: 700; font-size: 11px; line-height: normal; vertical-align: 1px; }
+  font-family: var(--mono); font-weight: 700; font-size: 12px; line-height: normal; vertical-align: 1px; }
 .fontes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-weight: 600; font-size: 13px; color: #6b6c74; line-height: normal; }
-.fontes span:not(:first-child) { padding: 7px 12px; border-radius: 999px; background: #e3e7ff; border: 1px solid #b9c4ff; color: var(--azul); }
+.fontes span:not(:first-child) { padding: 7px 12px; border-radius: 999px; background: #e3e7ff; border: 1px solid #b9c4ff; color: var(--azul-texto); }
 .aviso { font-size: 13px; color: #6b6c74; line-height: normal; }
 .erro { color: #b5470a; }
 .pensando { display: flex; gap: 8px; align-items: center; color: var(--texto-2); }
@@ -110,11 +121,12 @@ button { border: 0; background: none; cursor: pointer; }
 .compositor { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 0 24px 24px; }
 .caixa { width: min(760px, 100%); display: flex; flex-direction: column; gap: 14px; padding: 18px 14px 14px 22px; border-radius: 28px;
   background: var(--cartao); border: 1px solid var(--borda); box-shadow: 0 12px 32px rgba(0, 0, 0, .4); }
+.caixa:focus-within { border-color: var(--azul); }
 .caixa textarea { width: 100%; border: 0; background: none; resize: none; outline: none; font-size: 17px; line-height: 1.4; max-height: 200px; }
 .caixa textarea::placeholder { color: #6b6c74; }
 .linha { display: flex; align-items: center; gap: 10px; }
 .modos { display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--fundo); overflow-x: auto; }
-.modos button { padding: 7px 14px; border-radius: 999px; font-weight: 600; font-size: 13px; color: var(--texto-2); white-space: nowrap; transition: background-color .2s, color .2s; }
+.modos button { padding: 13px 16px; border-radius: 999px; font-weight: 600; font-size: 14px; line-height: normal; color: var(--texto-2); white-space: nowrap; transition: background-color .2s, color .2s; }
 .modos button:hover { color: var(--tinta); }
 .modos button[aria-pressed="true"] { background: var(--cor-modo); color: var(--sobre-modo); }
 .tarefa { position: relative; margin-left: auto; display: flex; align-items: center; border-radius: 999px; background: var(--fundo); border: 1px solid var(--borda); }
@@ -145,12 +157,75 @@ body[data-modo="Demonstrar"] .enviar img[data-modo="Demonstrar"], body[data-modo
 .painel-cartao li { display: flex; gap: 8px; align-items: baseline; font-size: 13px; color: #3a3b42; }
 .painel-cartao li::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: url("img/ponto-verde-6.svg"); translate: 0 -1px; }
 
+/* --- botões dentro das mensagens --- */
+.botao-chat { display: inline-flex; align-items: center; min-height: 44px; padding: 12px 20px; border-radius: 999px; font-weight: 600;
+  font-size: 14px; line-height: normal; transition: transform .15s, opacity .15s; }
+.botao-chat:not(:disabled):hover { transform: translateY(-1px); }
+.botao-chat:disabled { opacity: .45; cursor: default; }
+.botao-chat[aria-pressed="true"]:disabled { opacity: 1; }
+.botao-chat.laranja-fundo { background: var(--laranja); color: var(--tinta); }
+.botao-chat.contorno { background: var(--cartao); border: 1.5px solid #b9bcc6; }
+
+/* espera do "Faz pra mim" com etapas e tempo (13b) */
+.espera { width: 100%; display: flex; flex-direction: column; gap: 14px; padding: 18px 20px; border-radius: 20px;
+  background: var(--cartao); border: 1px solid var(--borda); line-height: normal; }
+.espera-topo { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.espera-topo strong { font-weight: 600; font-size: 16px; }
+.espera-tempo { font-weight: 500; font-size: 13px; color: var(--texto-2); font-variant-numeric: tabular-nums; }
+.etapas { display: flex; flex-direction: column; gap: 10px; font-size: 15px; color: #6b6c74; }
+.corpo .etapas li { gap: 10px; align-items: center; }
+.corpo .etapas li::before { content: "○"; width: 1em; flex: none; font-weight: 700; text-align: center; }
+.etapas li.feita { color: var(--texto-2); }
+.corpo .etapas li.feita::before { content: "✓"; color: var(--verde-texto); }
+.etapas li.agora { font-weight: 600; color: var(--tinta); }
+.corpo .etapas li.agora::before { content: "●"; color: var(--laranja); animation: pisca 1.2s ease-in-out infinite; }
+.espera-barra { height: 8px; border-radius: 999px; background: #dadde3; overflow: hidden; }
+.espera-barra span { display: block; width: 0; height: 100%; border-radius: 999px; background: var(--laranja); transition: width .6s ease-out; }
+.espera-nota { font-size: 13px; color: #6b6c74; }
+
+/* sugestão de modo (13c) */
+.escolha { display: flex; flex-direction: column; gap: 14px; }
+.escolha-botoes { display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* problema com o que fazer: Blender fechado (13d) e erros */
+.problema { width: 100%; display: flex; flex-direction: column; gap: 12px; padding: 20px; border-radius: 20px; background: #ffe6d6; line-height: 1.5; }
+.problema-titulo { font-weight: 600; font-size: 17px; }
+.problema-texto { font-size: 15px; }
+.corpo .problema ol { gap: 6px; font-weight: 500; font-size: 15px; }
+.corpo .problema ol li::before { color: var(--tinta); }
+.problema-botoes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 4px; }
+.problema details { font-size: 13px; color: var(--laranja-texto); }
+.problema summary { cursor: pointer; font-weight: 500; padding: 12px 0; }
+.problema-detalhe { padding: 10px 14px; border-radius: 12px; background: #fff3ea; color: var(--tinta); font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
+
+/* telas cheias: abrindo (0) e "Quase lá" (14) */
+.tela-cheia { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 24px; padding: 24px; background: var(--fundo); text-align: center; }
+.tela-cheia .marca { padding: 0; font-size: 22px; }
+.tela-cheia .marca.grande { gap: 16px; font-size: 34px; }
+.marca.grande .marca-m { padding: 6px 16px 10px; border-radius: 16px; font-size: 26px; }
+.carregando { width: 44px; height: 44px; border-radius: 50%; border: 3px solid var(--laranja); border-right-color: transparent; animation: gira 1s linear infinite; }
+.tela-cheia h1:not(.quase) { font-weight: 600; font-size: 22px; }
+.tela-cheia:not(#quase-la) > p:not(.marca) { max-width: 520px; font-size: 15px; color: var(--texto-2); }
+.quase { font-family: var(--display); font-weight: 900; font-size: 48px; letter-spacing: -1.4px; }
+#quase-la > p:not([class]) { font-size: 18px; color: #3a3b42; }
+.chame { display: flex; gap: 12px; align-items: center; padding: 14px 24px; border-radius: 999px; background: #ffe6d6; color: var(--laranja-texto);
+  font-weight: 600; font-size: 15px; }
+.link-professor { padding: 12px; font-weight: 500; font-size: 14px; color: var(--azul-texto); }
+.link-professor:hover { text-decoration: underline; }
+
 /* --- movimento --- */
 @keyframes surge { from { opacity: 0; translate: 0 var(--dy, 16px); } }
 @keyframes chama { 50% { scale: 1.12; } }
 @keyframes pisca { 50% { opacity: .25; } }
+@keyframes gira { to { rotate: 360deg; } }
 .entra { animation: surge .5s ease-out var(--d, 0s) backwards; }
 .pisca { animation: pisca 1s ease-in-out infinite; }
+/* toque: alvos de pelo menos 44 px (o visual do computador não muda) */
+@media (pointer: coarse) {
+  .item, .modos button, .atualizar, .pilula, .codigo-botoes button, .botao, .ficha { min-height: 44px; }
+  .menu { min-width: 44px; min-height: 44px; }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
@@ -164,16 +239,18 @@ body[data-modo="Demonstrar"] .enviar img[data-modo="Demonstrar"], body[data-modo
   .lateral.aberta { translate: 0 0; box-shadow: 20px 0 40px rgba(22, 22, 26, .15); }
   .menu { display: block; }
   .barra { padding: 12px 16px; }
-  .modelo { margin-right: auto; }
   .centro { padding: 0 16px 12px; }
   .compositor { padding: 0 12px 16px; }
   .caixa { padding: 14px 8px 8px 14px; border-radius: 24px; box-shadow: 0 8px 24px rgba(0, 0, 0, .18); }
   .boas-vindas h1 { font-size: 28px; }
+  .quase { font-size: 36px; }
+  .chame { border-radius: 20px; text-align: left; }
   .sugestoes { grid-template-columns: 1fr; }
   .painel:not([hidden]) { width: 100%; }
   .linha { flex-wrap: wrap; }
   .modos { flex: 1 1 auto; min-width: 0; }
-  .modos button { padding: 6px 8px; font-size: 12px; }
+  .modos { flex-basis: 100%; }
+  .modos button { flex: 1 1 auto; padding: 12px 6px; font-size: 13px; }
   .linha { gap: 8px; }
   .tarefa { order: 3; margin-left: 0; flex-basis: 100%; }
   .tarefa:not([hidden]) + .enviar { margin-left: auto; }

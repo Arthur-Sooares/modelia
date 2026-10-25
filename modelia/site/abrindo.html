@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Abrindo o Modelia…</title>
+  <link rel="icon" href="img/marca.svg">
+  <link rel="stylesheet" href="base.css">
+  <link rel="stylesheet" href="chat.css">
+</head>
+<body>
+<!-- Tela "0 · Abrindo o Modelia" do Figma. O atalho da área de trabalho (modelia/atalho/abrir.vbs) abre este
+     arquivo direto do disco, na hora, enquanto o servidor ainda está subindo; quando ele responde, vai para o chat
+     (que continua mostrando "Abrindo…" até a IA ficar pronta). -->
+<section class="tela-cheia" aria-live="polite">
+  <p class="marca grande"><span class="marca-m">m</span>modelia</p>
+  <span class="carregando" id="carregando" aria-hidden="true"></span>
+  <h1 id="titulo">Abrindo o Modelia…</h1>
+  <p id="texto">Ligando a inteligência artificial. Leva alguns segundos.</p>
+</section>
+<script>
+  // Mesmo endereço de config.PORTA. "no-cors": daqui (file://) não dá para ler a resposta, só saber se o
+  // servidor respondeu.
+  const CHAT = "http://127.0.0.1:7860/chat.html";
+  const inicio = Date.now();
+  async function esperar() {
+    try {
+      await fetch("http://127.0.0.1:7860/api/situacao", { mode: "no-cors", cache: "no-store" });
+      location.replace(CHAT);
+      return;
+    } catch {
+      // ainda subindo
+    }
+    if (Date.now() - inicio > 120000) {
+      document.getElementById("carregando").hidden = true;
+      document.getElementById("titulo").textContent = "O Modelia não abriu";
+      document.getElementById("texto").textContent = "Feche esta janela e clique duas vezes no ícone de novo. "
+        + "Se continuar assim, chame o professor.";
+      return;
+    }
+    setTimeout(esperar, 1000);
+  }
+  esperar();
+</script>
+</body>
+</html>

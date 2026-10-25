@@ -9,53 +9,33 @@
   <link rel="stylesheet" href="chat.css">
 </head>
 <body data-modo="Ensinar">
+<a class="pular" href="#texto">Pular para a mensagem</a>
 
 <aside class="lateral" id="lateral">
   <a class="marca" href="/"><span class="marca-m">m</span>modelia</a>
   <button class="nova" id="nova" type="button"><span>+</span>Nova conversa</button>
 
-  <nav class="grupo" aria-label="Modo">
-    <p class="grupo-titulo">Modo</p>
-    <button class="item" data-modo="Explicar" type="button"><img src="img/ponto-azul-8.svg" alt="">Explicar</button>
-    <button class="item" data-modo="Ensinar" type="button"><img src="img/ponto-laranja-8.svg" alt="">Ensinar</button>
-    <button class="item" data-modo="Demonstrar" type="button"><img src="img/ponto-tinta-8.svg" alt="">Demonstrar</button>
-    <button class="item" data-modo="Verificar" type="button"><img src="img/ponto-verde-8.svg" alt="">Verificar</button>
+  <nav class="grupo" aria-label="O que você quer fazer?">
+    <p class="grupo-titulo">O que você quer fazer?</p>
+    <button class="item" data-modo="Explicar" type="button"><img src="img/ponto-azul-8.svg" alt="">Tenho uma dúvida</button>
+    <button class="item" data-modo="Ensinar" type="button"><img src="img/ponto-laranja-8.svg" alt="">Me ensina passo a passo</button>
+    <button class="item" data-modo="Demonstrar" type="button"><img src="img/ponto-tinta-8.svg" alt="">Faz pra mim</button>
+    <button class="item" data-modo="Verificar" type="button"><img src="img/ponto-verde-8.svg" alt="">Confere meu trabalho</button>
   </nav>
 
-  <nav class="grupo" id="hoje" aria-label="Conversas de hoje" hidden>
-    <p class="grupo-titulo">Hoje</p>
-  </nav>
-
-  <nav class="grupo" aria-label="Pesquisador">
-    <p class="grupo-titulo">Pesquisador</p>
-    <a class="item" href="/app/">Modelos</a>
-    <a class="item" href="/app/">Conhecimento</a>
-    <a class="item" href="/app/">Histórico</a>
-    <a class="item" href="/app/">Experimento</a>
+  <nav class="grupo" id="hoje" aria-label="Suas conversas de hoje" hidden>
+    <p class="grupo-titulo">Suas conversas de hoje</p>
   </nav>
 
   <div class="espaco"></div>
-  <div class="participante">
-    <span class="avatar">V</span>
-    <div>
-      <p class="participante-nome">Visitante</p>
-      <p class="estados">
-        <span id="estado-ollama"><img src="img/ponto-verde-7.svg" alt="">Ollama</span>
-        <span id="estado-blender"><img src="img/ponto-verde-7.svg" alt="">Blender</span>
-      </p>
-    </div>
-  </div>
+  <a class="professor" href="pesquisador.html">Área do professor <span aria-hidden="true">→</span></a>
 </aside>
 
 <main class="principal">
   <header class="barra">
     <button class="menu" id="menu" type="button" aria-label="Abrir menu" aria-controls="lateral">☰</button>
-    <label class="pilula modelo">
-      <span class="sr">Modelo de IA</span>
-      <select id="modelo"></select><span aria-hidden="true">▾</span>
-    </label>
     <button class="pilula" id="botao-cena" type="button" aria-controls="painel" aria-expanded="false">
-      <img id="ponto-cena" src="img/ponto-verde-7.svg" alt=""><span>Cena<span class="cena-extra"> do Blender</span></span>
+      <img id="ponto-cena" src="img/ponto-verde-7.svg" alt=""><span id="cena-rotulo">Cena<span class="cena-extra"> do Blender</span></span>
     </button>
   </header>
 
@@ -63,14 +43,14 @@
     <div class="boas-vindas" id="boas-vindas">
       <h1 class="entra">Oi! O que vamos <span class="laranja">modelar</span> hoje?</h1>
       <div class="sugestoes">
-        <button class="sugestao entra" style="--d:.4s" data-modo="Explicar" type="button">
-          <span class="sugestao-modo"><img src="img/ponto-azul-7.svg" alt="">Explicar</span>O que é extrusão e quando usar?</button>
-        <button class="sugestao entra" style="--d:.5s" data-modo="Ensinar" type="button">
-          <span class="sugestao-modo"><img src="img/ponto-laranja-7.svg" alt="">Ensinar</span>Me ensina a fazer uma mesa</button>
-        <button class="sugestao entra" style="--d:.6s" data-modo="Verificar" type="button">
-          <span class="sugestao-modo"><img src="img/ponto-verde-7.svg" alt="">Verificar</span>Minha mesa está certa?</button>
-        <button class="sugestao entra" style="--d:.7s" data-modo="Demonstrar" type="button">
-          <span class="sugestao-modo"><img src="img/ponto-tinta-7.svg" alt="">Demonstrar</span>Faz uma mesa com cadeira</button>
+        <button class="sugestao entra" style="--d:.4s" data-modo="Explicar" data-pedido="O que é extrusão e quando usar?" type="button">
+          <span class="sugestao-modo"><img src="img/ponto-azul-7.svg" alt="">Tenho uma dúvida</span>Ex.: o que é extrusão e quando usar?</button>
+        <button class="sugestao entra" style="--d:.5s" data-modo="Ensinar" data-pedido="Me ensina a fazer uma mesa" type="button">
+          <span class="sugestao-modo"><img src="img/ponto-laranja-7.svg" alt="">Me ensina passo a passo</span>Ex.: me ensina a fazer uma mesa</button>
+        <button class="sugestao entra" style="--d:.6s" data-modo="Verificar" data-pedido="Minha mesa está certa?" type="button">
+          <span class="sugestao-modo"><img src="img/ponto-verde-7.svg" alt="">Confere meu trabalho</span>Ex.: minha cadeira está certa?</button>
+        <button class="sugestao entra" style="--d:.7s" data-modo="Demonstrar" data-pedido="Faz uma mesa com cadeira" type="button">
+          <span class="sugestao-modo"><img src="img/ponto-tinta-7.svg" alt="">Faz pra mim</span>Ex.: faz uma mesa com cadeira</button>
       </div>
     </div>
   </section>
@@ -78,13 +58,13 @@
   <form class="compositor" id="compositor">
     <div class="caixa entra" style="--d:.3s">
       <label class="sr" for="texto">Mensagem</label>
-      <textarea id="texto" rows="1" placeholder="Pergunte ou peça uma tarefa…"></textarea>
+      <textarea id="texto" rows="1" placeholder="Escreva aqui o que você quer…"></textarea>
       <div class="linha">
-        <div class="modos" role="group" aria-label="Modo">
-          <button type="button" data-modo="Explicar">Explicar</button>
-          <button type="button" data-modo="Ensinar">Ensinar</button>
-          <button type="button" data-modo="Demonstrar">Demonstrar</button>
-          <button type="button" data-modo="Verificar">Verificar</button>
+        <div class="modos" role="group" aria-label="O que você quer fazer?">
+          <button type="button" data-modo="Explicar" title="Tenho uma dúvida">Dúvida</button>
+          <button type="button" data-modo="Ensinar" title="Me ensina passo a passo">Passo a passo</button>
+          <button type="button" data-modo="Demonstrar" title="Faz pra mim">Faz pra mim</button>
+          <button type="button" data-modo="Verificar" title="Confere meu trabalho">Conferir</button>
         </div>
         <label class="tarefa" id="tarefa-rotulo" hidden>
           <span class="sr">Tarefa-meta</span>
@@ -115,11 +95,26 @@
   </div>
 </aside>
 
+<section class="tela-cheia" id="abrindo" hidden aria-live="polite">
+  <p class="marca grande"><span class="marca-m">m</span>modelia</p>
+  <span class="carregando" aria-hidden="true"></span>
+  <h1>Abrindo o Modelia…</h1>
+  <p>Ligando a inteligência artificial. Leva alguns segundos.</p>
+</section>
+<section class="tela-cheia" id="quase-la" hidden>
+  <p class="marca"><span class="marca-m">m</span>modelia</p>
+  <h1 class="quase">Quase lá!</h1>
+  <p>Este computador ainda não está pronto para usar o Modelia.</p>
+  <p class="chame"><span aria-hidden="true">✋</span>Chame o professor para preparar. Só precisa fazer isso uma vez.</p>
+  <a class="link-professor" href="pesquisador.html#instalacao">Sou o professor <span aria-hidden="true">→</span> preparar este computador</a>
+</section>
+
 <template id="tpl-aluno">
   <div class="msg-aluno entra"><p></p></div>
 </template>
 <template id="tpl-modelia">
-  <div class="msg-modelia entra"><span class="marca-m pequeno" aria-hidden="true">m</span><div class="corpo"></div></div>
+  <div class="msg-modelia entra"><span class="marca-m pequeno" aria-hidden="true">m</span>
+    <div class="coluna-modelia"><div class="corpo"></div><p class="tempo" hidden></p></div></div>
 </template>
 <template id="tpl-codigo">
   <div class="codigo entra" style="--d:.5s; --dy:24px">
@@ -129,6 +124,35 @@
       <button class="executar" type="button">Executar no Blender</button>
       <button class="cancelar" type="button">Cancelar</button>
     </p>
+  </div>
+</template>
+<template id="tpl-espera">
+  <div class="espera">
+    <p class="espera-topo"><strong></strong><span class="espera-tempo"></span></p>
+    <ol class="etapas"></ol>
+    <div class="espera-barra"><span></span></div>
+    <p class="espera-nota"></p>
+  </div>
+</template>
+<template id="tpl-escolha">
+  <div class="escolha">
+    <p></p>
+    <p class="escolha-botoes">
+      <button class="botao-chat laranja-fundo" type="button" data-modo="Ensinar">Me ensina passo a passo</button>
+      <button class="botao-chat contorno" type="button" data-modo="Demonstrar">Faz pra mim</button>
+    </p>
+    <p class="aviso">Você pode trocar quando quiser nos botões lá embaixo.</p>
+  </div>
+</template>
+<template id="tpl-problema">
+  <div class="problema">
+    <p class="problema-titulo"></p>
+    <p class="problema-texto"></p>
+    <ol></ol>
+    <div class="problema-botoes">
+      <button class="botao-chat laranja-fundo" type="button"></button>
+      <details><summary>Ver detalhes técnicos</summary><p class="problema-detalhe"></p></details>
+    </div>
   </div>
 </template>
 <template id="tpl-resultado">
