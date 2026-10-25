@@ -89,8 +89,8 @@ def _puro(blender, modelo, tarefa, opcoes, conversar):
 
 def _modelia(blender, banco, modelo, tarefa, opcoes, conversar):
     """O mesmo pedido pelo modo Demonstrar. Devolve (chamadas, erros, códigos, final)."""
-    def conversar_com_opcoes(modelo, mensagens, ferramentas=None, _opcoes=None):
-        return conversar(modelo, mensagens, ferramentas, opcoes)  # mesma seed e temperatura do puro
+    def conversar_com_opcoes(modelo, mensagens, ferramentas=None, _opcoes=None, **extras):
+        return conversar(modelo, mensagens, ferramentas, opcoes, **extras)  # mesma seed e temperatura do puro
 
     ag = agente.Agente(blender, None, banco, conversar=conversar_com_opcoes)
     estado = agente.Estado(banco.iniciar_sessao("EXP"), modelo, modo=agente.DEMONSTRAR)

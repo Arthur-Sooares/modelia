@@ -1,0 +1,303 @@
+"""Biblioteca de fichas de peças bem feitas, usadas como exemplo para a LLM (few-shot dinâmico).
+
+Para cada pedido sem receita, o Modelia mostra à LLM as fichas dos objetos mais parecidos
+(pecas.exemplos_para). Um modelo de 4B copia muito bem um exemplo próximo e erra quando monta
+um objeto do zero; por isso a biblioteca cobre categorias variadas. As fichas foram escritas e
+conferidas no Blender à mão: são a "resposta do professor" que o modelo pequeno imita.
+
+Convenções: frente = -Y, direita = +X; medidas em metros; cores de receitas.CORES.
+"""
+
+
+def P(nome, forma, largura, profundidade, altura, posicao="centro", de="chao", cor="cinza", **extra):
+    return {"nome": nome, "forma": forma, "largura": largura, "profundidade": profundidade, "altura": altura,
+            "posicao": posicao, "de": de, "cor": cor, **extra}
+
+
+def F(objeto, descricao, *pecas):
+    return {"objeto": objeto, "descricao": descricao, "pecas": list(pecas)}
+
+
+# (nomes que o aluno usa, ficha). O primeiro nome é o principal.
+EXEMPLOS = [
+    # --- utensílios ---
+    (["copo"], F("copo", "Cilindro oco de vidro, aberto em cima, a boca um pouco mais larga; sem alça.",
+                 P("Corpo", "cilindro_oco", 0.07, 0.07, 0.12, cor="vidro", topo=1.15))),
+    (["caneca"], F("caneca", "Cilindro oco grosso com uma alça do lado.",
+                   P("Corpo", "cilindro_oco", 0.08, 0.08, 0.1, cor="branco"),
+                   P("Alca", "alca", 0.03, 0.01, 0.06, "ao_lado_direita", "Corpo", "branco"))),
+    (["xicara", "xicara de cafe", "xicara de cha"], F(
+        "xícara", "Pires redondo embaixo, xícara baixa com a boca larga e uma alça pequena do lado.",
+        P("Pires", "cilindro", 0.14, 0.14, 0.01, cor="branco"),
+        P("Corpo", "cilindro_oco", 0.07, 0.07, 0.06, "em_cima", "Pires", "branco", topo=1.3),
+        P("Alca", "alca", 0.02, 0.01, 0.04, "ao_lado_direita", "Corpo", "branco"))),
+    (["garrafa", "garrafa de agua", "garrafa pet"], F(
+        "garrafa", "Corpo cilíndrico, ombro que afina, gargalo fino e tampinha; sem alça.",
+        P("Corpo", "cilindro", 0.07, 0.07, 0.2, cor="verde"),
+        P("Ombro", "cilindro", 0.07, 0.07, 0.05, "em_cima", "Corpo", "verde", topo=0.35),
+        P("Gargalo", "cilindro", 0.025, 0.025, 0.05, "em_cima", "Ombro", "verde"),
+        P("Tampa", "cilindro", 0.03, 0.03, 0.015, "em_cima", "Gargalo", "vermelho"))),
+    (["prato"], F("prato", "Disco raso e largo, com a borda levantada.",
+                  P("Prato", "cilindro_oco", 0.26, 0.26, 0.025, cor="branco", topo=1.1))),
+    (["tigela", "bacia", "cumbuca"], F("tigela", "Cuia funda, mais estreita no fundo e larga na boca.",
+                                       P("Tigela", "cilindro_oco", 0.11, 0.11, 0.07, cor="branco", topo=1.45))),
+    (["panela"], F("panela", "Cilindro oco de metal com um cabo comprido de um lado e uma tampa.",
+                   P("Corpo", "cilindro_oco", 0.24, 0.24, 0.13, cor="cinza"),
+                   P("Tampa", "cilindro", 0.25, 0.25, 0.01, "em_cima", "Corpo", "cinza"),
+                   P("Pegador", "esfera", 0.03, 0.03, 0.02, "em_cima", "Tampa", "preto"),
+                   P("Cabo", "caixa", 0.2, 0.03, 0.025, "ao_lado_direita", "Corpo", "preto", altura_do_chao=0.09))),
+    (["balde"], F("balde", "Cilindro oco mais largo em cima, com uma alça de cada lado.",
+                  P("Corpo", "cilindro_oco", 0.25, 0.25, 0.28, cor="azul", topo=1.2),
+                  P("AlcaEsquerda", "alca", 0.04, 0.01, 0.06, "ao_lado_esquerda", "Corpo", "cinza", altura_do_chao=0.2),
+                  P("AlcaDireita", "alca", 0.04, 0.01, 0.06, "ao_lado_direita", "Corpo", "cinza", altura_do_chao=0.2))),
+    (["vela"], F("vela", "Cilindro de cera com um pavio fino e uma chama em ponta.",
+                 P("Cera", "cilindro", 0.06, 0.06, 0.15, cor="branco"),
+                 P("Pavio", "cilindro", 0.004, 0.004, 0.015, "em_cima", "Cera", "preto"),
+                 P("Chama", "cone", 0.018, 0.018, 0.035, "em_cima", "Pavio", "laranja"))),
+    (["lapis", "caneta"], F("lápis", "Bastão amarelo comprido com borracha embaixo e ponta afiada em cima.",
+                            P("Borracha", "cilindro", 0.008, 0.008, 0.012, cor="rosa"),
+                            P("Corpo", "cilindro", 0.008, 0.008, 0.15, "em_cima", "Borracha", "amarelo"),
+                            P("Ponta", "cone", 0.008, 0.008, 0.02, "em_cima", "Corpo", "bege", topo=0.3),
+                            P("Grafite", "cone", 0.0025, 0.0025, 0.006, "em_cima", "Ponta", "preto"))),
+    (["livro", "caderno"], F("livro", "Bloco de folhas brancas entre duas capas coloridas.",
+                             P("CapaBaixo", "caixa", 0.16, 0.23, 0.003, cor="vermelho"),
+                             P("Folhas", "caixa", 0.15, 0.22, 0.025, "em_cima", "CapaBaixo", "branco"),
+                             P("CapaCima", "caixa", 0.16, 0.23, 0.003, "em_cima", "Folhas", "vermelho"))),
+    (["presente", "caixa de presente"], F(
+        "presente", "Caixa com duas fitas cruzadas por cima e um laço no topo.",
+        P("Caixa", "caixa", 0.3, 0.3, 0.3, cor="vermelho"),
+        P("FitaX", "caixa", 0.31, 0.04, 0.31, "no_meio", "Caixa", "amarelo"),
+        P("FitaY", "caixa", 0.04, 0.31, 0.31, "no_meio", "Caixa", "amarelo"),
+        P("Laco", "esfera", 0.09, 0.09, 0.05, "em_cima", "Caixa", "amarelo"))),
+    (["trofeu", "taca"], F("troféu", "Base quadrada, haste curta e uma taça dourada com duas alças.",
+                           P("Base", "caixa", 0.12, 0.12, 0.05, cor="preto"),
+                           P("Haste", "cilindro", 0.025, 0.025, 0.08, "em_cima", "Base", "amarelo"),
+                           P("Taca", "cilindro_oco", 0.1, 0.1, 0.1, "em_cima", "Haste", "amarelo", topo=1.3),
+                           P("AlcaEsquerda", "alca", 0.03, 0.01, 0.06, "ao_lado_esquerda", "Taca", "amarelo"),
+                           P("AlcaDireita", "alca", 0.03, 0.01, 0.06, "ao_lado_direita", "Taca", "amarelo"))),
+    # --- eletrônicos ---
+    (["televisao", "tv", "televisor", "monitor"], F(
+        "televisão", "Tela fina e larga, em pé sobre um pé pequeno, com a imagem na frente.",
+        P("Base", "caixa", 0.35, 0.22, 0.02, cor="preto"),
+        P("Pe", "caixa", 0.06, 0.04, 0.12, "em_cima", "Base", "preto"),
+        P("Moldura", "caixa", 1.2, 0.06, 0.7, "em_cima", "Pe", "preto"),
+        P("Imagem", "caixa", 1.14, 0.005, 0.64, "ao_lado_frente", "Moldura", "azul"))),
+    (["notebook", "laptop"], F(
+        "notebook", "Base fina com teclado e touchpad, e a tela em pé na borda de trás.",
+        P("Base", "caixa", 0.34, 0.24, 0.02, cor="cinza"),
+        P("Teclado", "caixa", 0.3, 0.12, 0.003, "em_cima", "Base", "preto"),
+        P("Touchpad", "caixa", 0.1, 0.06, 0.002, "em_cima_frente", "Base", "preto"),
+        P("Tela", "caixa", 0.34, 0.012, 0.23, "em_cima_tras", "Base", "cinza"),
+        P("Imagem", "caixa", 0.31, 0.003, 0.19, "ao_lado_frente", "Tela", "azul"))),
+    (["celular", "smartphone", "telefone"], F(
+        "celular", "Placa fina e retangular deitada, com a tela ocupando quase toda a face de cima.",
+        P("Corpo", "caixa", 0.075, 0.155, 0.009, cor="preto"),
+        P("Tela", "caixa", 0.068, 0.14, 0.001, "em_cima", "Corpo", "azul"))),
+    (["computador", "pc", "gabinete"], F(
+        "computador", "Gabinete em pé ao lado de um monitor sobre um pé, com teclado na frente.",
+        P("Monitor", "caixa", 0.55, 0.05, 0.33, cor="preto", altura_do_chao=0.12),
+        P("Pe", "caixa", 0.06, 0.05, 0.12, "embaixo_centro", "Monitor", "preto"),
+        P("Imagem", "caixa", 0.51, 0.004, 0.29, "ao_lado_frente", "Monitor", "azul"),
+        P("Teclado", "caixa", 0.45, 0.15, 0.02, "ao_lado_frente", "Pe", "cinza", altura_do_chao=0, mover_y=-0.1),
+        P("Gabinete", "caixa", 0.2, 0.45, 0.42, "ao_lado_direita", "Pe", "preto", altura_do_chao=0, mover_x=0.3))),
+    # --- comida ---
+    (["hamburguer", "sanduiche", "lanche"], F(
+        "hambúrguer", "Pão de baixo, carne, queijo, alface e pão de cima redondo, empilhados nessa ordem.",
+        P("PaoBaixo", "cilindro", 0.12, 0.12, 0.03, cor="laranja"),
+        P("Carne", "cilindro", 0.125, 0.125, 0.02, "em_cima", "PaoBaixo", "marrom"),
+        P("Queijo", "caixa", 0.11, 0.11, 0.005, "em_cima", "Carne", "amarelo"),
+        P("Alface", "cilindro", 0.13, 0.13, 0.008, "em_cima", "Queijo", "verde"),
+        P("PaoCima", "esfera", 0.12, 0.12, 0.06, "em_cima", "Alface", "laranja"))),
+    (["bolo", "bolo de aniversario"], F(
+        "bolo", "Bolo redondo sobre um prato, com cobertura e uma cereja no topo.",
+        P("Prato", "cilindro", 0.32, 0.32, 0.01, cor="branco"),
+        P("Massa", "cilindro", 0.25, 0.25, 0.1, "em_cima", "Prato", "marrom"),
+        P("Cobertura", "cilindro", 0.26, 0.26, 0.02, "em_cima", "Massa", "rosa"),
+        P("Cereja", "esfera", 0.03, 0.03, 0.03, "em_cima", "Cobertura", "vermelho"))),
+    (["sorvete", "casquinha"], F("sorvete", "Casquinha em cone de ponta para baixo e uma bola de sorvete em cima.",
+                                 P("Casquinha", "cilindro", 0.02, 0.02, 0.12, cor="bege", topo=3),
+                                 P("Bola", "esfera", 0.065, 0.065, 0.06, "em_cima", "Casquinha", "rosa"))),
+    (["maca", "fruta"], F("maçã", "Fruta redonda vermelha com um cabinho e uma folha em cima.",
+                          P("Fruta", "esfera", 0.08, 0.08, 0.075, cor="vermelho"),
+                          P("Cabinho", "cilindro", 0.006, 0.006, 0.02, "em_cima", "Fruta", "marrom"),
+                          P("Folha", "esfera", 0.03, 0.03, 0.008, "em_cima_direita", "Fruta", "verde"))),
+    (["pizza"], F("pizza", "Disco de massa com molho, queijo e rodelas de calabresa espalhadas.",
+                  P("Massa", "cilindro", 0.35, 0.35, 0.015, cor="bege"),
+                  P("Molho", "cilindro", 0.32, 0.32, 0.004, "em_cima", "Massa", "laranja"),
+                  P("Calabresa", "cilindro", 0.04, 0.04, 0.004, "em_cima", "Molho", "vermelho",
+                    repetir_x=3, repetir_y=3, espaco=0.05))),
+    # --- natureza ---
+    (["arvore", "arvore frondosa"], F("árvore", "Tronco marrom em pé e uma copa verde redonda em cima.",
+                                      P("Tronco", "cilindro", 0.4, 0.4, 2, cor="marrom"),
+                                      P("Copa", "esfera", 2.6, 2.6, 2.4, "em_cima", "Tronco", "verde"))),
+    (["pinheiro", "arvore de natal"], F(
+        "pinheiro", "Tronco curto e três cones verdes empilhados, cada um menor que o de baixo.",
+        P("Tronco", "cilindro", 0.3, 0.3, 0.8, cor="marrom"),
+        P("Copa1", "cone", 2.2, 2.2, 1.4, "em_cima", "Tronco", "verde", topo=0.35),
+        P("Copa2", "cone", 1.6, 1.6, 1.2, "em_cima", "Copa1", "verde", topo=0.3),
+        P("Copa3", "cone", 1.1, 1.1, 1.2, "em_cima", "Copa2", "verde"))),
+    (["cogumelo"], F("cogumelo", "Talo claro em pé e um chapéu vermelho largo e arredondado em cima.",
+                     P("Talo", "cilindro", 0.04, 0.04, 0.06, cor="bege", topo=0.85),
+                     P("Chapeu", "esfera", 0.12, 0.12, 0.06, "em_cima", "Talo", "vermelho"))),
+    (["flor", "vaso de flor", "planta"], F(
+        "flor no vaso", "Vaso com terra, caule verde fino, pétalas num disco e o miolo amarelo no meio.",
+        P("Vaso", "cilindro_oco", 0.15, 0.15, 0.14, cor="laranja", topo=1.2),
+        P("Terra", "cilindro", 0.15, 0.15, 0.1, "dentro", "Vaso", "marrom"),
+        P("Caule", "cilindro", 0.01, 0.01, 0.25, "em_cima", "Terra", "verde"),
+        P("Petalas", "esfera", 0.12, 0.12, 0.02, "em_cima", "Caule", "rosa"),
+        P("Miolo", "esfera", 0.04, 0.04, 0.02, "em_cima", "Petalas", "amarelo"))),
+    (["cacto"], F("cacto", "Vaso com terra, um corpo verde em pé de topo redondo e um braço do lado.",
+                  P("Vaso", "cilindro_oco", 0.14, 0.14, 0.12, cor="laranja"),
+                  P("Terra", "cilindro", 0.14, 0.14, 0.1, "dentro", "Vaso", "marrom"),
+                  P("Corpo", "cilindro", 0.07, 0.07, 0.25, "em_cima", "Terra", "verde"),
+                  P("Topo", "esfera", 0.07, 0.07, 0.05, "em_cima", "Corpo", "verde"),
+                  P("Braco", "cilindro", 0.04, 0.04, 0.1, "ao_lado_direita", "Corpo", "verde"))),
+    # --- construções ---
+    (["casa", "casinha"], F(
+        "casa", "Paredes retangulares, telhado de duas águas, porta na frente e janelas dos lados da porta.",
+        P("Paredes", "caixa", 8, 6, 3, cor="bege"),
+        P("Telhado", "telhado", 8.6, 6.6, 2, "em_cima", "Paredes", "vermelho"),
+        P("Porta", "caixa", 1, 0.08, 2.1, "ao_lado_frente", "Paredes", "madeira", altura_do_chao=0),
+        P("JanelaEsquerda", "caixa", 1.2, 0.06, 1, "ao_lado_frente", "Paredes", "azul", mover_x=-2.5),
+        P("JanelaDireita", "caixa", 1.2, 0.06, 1, "ao_lado_frente", "Paredes", "azul", mover_x=2.5))),
+    (["predio", "edificio", "arranha-ceu"], F(
+        "prédio", "Torre alta e retangular, com fileiras de janelas na frente e a porta embaixo.",
+        P("Corpo", "caixa", 10, 10, 30, cor="cinza"),
+        P("Janelas", "caixa", 1.5, 0.1, 1.5, "ao_lado_frente", "Corpo", "azul", altura_do_chao=4,
+          repetir_x=4, repetir_z=8, espaco=1),
+        P("Porta", "caixa", 2.5, 0.1, 2.8, "ao_lado_frente", "Corpo", "preto", altura_do_chao=0))),
+    (["casinha de cachorro", "casa de cachorro"], F(
+        "casinha de cachorro", "Caixa de madeira pequena com telhado de duas águas e uma porta escura na frente.",
+        P("Paredes", "caixa", 0.8, 1, 0.7, cor="madeira"),
+        P("Telhado", "telhado", 0.95, 1.15, 0.4, "em_cima", "Paredes", "vermelho"),
+        P("Porta", "caixa", 0.35, 0.02, 0.45, "ao_lado_frente", "Paredes", "preto", altura_do_chao=0))),
+    (["barraca", "tenda"], F("barraca", "Telhado de duas águas apoiado direto no chão, com a porta na ponta.",
+                             P("Lona", "telhado", 2.4, 2, 1.3, cor="verde"),
+                             P("Porta", "caixa", 0.02, 0.6, 0.7, "ao_lado_direita", "Lona", "preto",
+                               altura_do_chao=0))),
+    # --- veículos ---
+    (["carro", "automovel"], F(
+        "carro", "Carroceria comprida e baixa, cabine de vidro menor em cima e quatro rodas pretas.",
+        P("Carroceria", "caixa", 4, 1.8, 0.7, cor="vermelho", altura_do_chao=0.25),
+        P("Cabine", "caixa", 2.2, 1.6, 0.6, "em_cima", "Carroceria", "vidro"),
+        P("Roda", "cilindro", 0.65, 0.65, 0.25, "rodas", "Carroceria", "preto", deitado=True))),
+    (["caminhao"], F("caminhão", "Baú grande atrás, cabine mais baixa na frente e rodas pretas.",
+                     P("Bau", "caixa", 5, 2.4, 2.6, cor="branco", altura_do_chao=0.5),
+                     P("Cabine", "caixa", 1.8, 2.3, 2.2, "ao_lado_direita", "Bau", "vermelho"),
+                     P("Roda", "cilindro", 0.9, 0.9, 0.3, "rodas", "Bau", "preto", deitado=True))),
+    (["onibus"], F("ônibus", "Corpo comprido e alto, uma fileira de janelas na lateral da frente e rodas.",
+                   P("Corpo", "caixa", 12, 2.5, 3, cor="amarelo", altura_do_chao=0.4),
+                   P("Janelas", "caixa", 1.2, 0.05, 0.9, "ao_lado_frente", "Corpo", "vidro", altura_do_chao=1.5,
+                     repetir_x=7, espaco=0.4),
+                   P("Roda", "cilindro", 1, 1, 0.3, "rodas", "Corpo", "preto", deitado=True))),
+    (["aviao"], F("avião", "Fuselagem comprida deitada, asas largas atravessando o meio e a cauda em pé atrás.",
+                  P("Fuselagem", "cilindro", 3, 3, 30, cor="branco", deitado=True, altura_do_chao=1.5),
+                  P("Asas", "caixa", 30, 4, 0.4, "no_meio", "Fuselagem", "cinza"),
+                  P("Cauda", "caixa", 0.4, 3, 4, "em_cima_tras", "Fuselagem", "vermelho"),
+                  P("TremDePouso", "cilindro", 0.4, 0.4, 1.5, "embaixo_centro", "Fuselagem", "preto"))),
+    (["foguete"], F("foguete", "Corpo cilíndrico alto, ponta em cone em cima e quatro aletas embaixo.",
+                    P("Corpo", "cilindro", 1, 1, 5, cor="branco"),
+                    P("Ponta", "cone", 1, 1, 1.5, "em_cima", "Corpo", "vermelho"),
+                    P("AletaEsquerda", "caixa", 0.6, 0.08, 1.2, "ao_lado_esquerda", "Corpo", "vermelho", altura_do_chao=0),
+                    P("AletaDireita", "caixa", 0.6, 0.08, 1.2, "ao_lado_direita", "Corpo", "vermelho", altura_do_chao=0),
+                    P("AletaFrente", "caixa", 0.08, 0.6, 1.2, "ao_lado_frente", "Corpo", "vermelho", altura_do_chao=0),
+                    P("AletaTras", "caixa", 0.08, 0.6, 1.2, "ao_lado_tras", "Corpo", "vermelho", altura_do_chao=0))),
+    # --- brinquedos ---
+    (["cubo magico", "cubo de rubik"], F(
+        "cubo mágico", "Cubo de 3 x 3 x 3 cubinhos pretos com quadradinhos coloridos em cada face.",
+        P("Cubinho", "caixa", 0.018, 0.018, 0.018, cor="preto", repetir_x=3, repetir_y=3, repetir_z=3,
+          espaco=0.0015),
+        P("FaceFrente", "caixa", 0.016, 0.002, 0.016, "ao_lado_frente", "Cubinho", "vermelho", altura_do_chao=0.001,
+          repetir_x=3, repetir_z=3, espaco=0.0035),
+        P("FaceDireita", "caixa", 0.002, 0.016, 0.016, "ao_lado_direita", "Cubinho", "azul", altura_do_chao=0.001,
+          repetir_y=3, repetir_z=3, espaco=0.0035),
+        P("FaceCima", "caixa", 0.016, 0.016, 0.002, "em_cima", "Cubinho", "amarelo",
+          repetir_x=3, repetir_y=3, espaco=0.0035))),
+    (["boneco de neve"], F(
+        "boneco de neve", "Três bolas brancas empilhadas, cada uma menor; nariz de cenoura, olhos e cartola.",
+        P("Base", "esfera", 0.8, 0.8, 0.8, cor="branco"),
+        P("Meio", "esfera", 0.6, 0.6, 0.6, "em_cima", "Base", "branco"),
+        P("Cabeca", "esfera", 0.4, 0.4, 0.4, "em_cima", "Meio", "branco"),
+        P("Nariz", "cilindro", 0.04, 0.04, 0.15, "ao_lado_frente", "Cabeca", "laranja", deitado=True),
+        P("OlhoEsquerdo", "esfera", 0.05, 0.05, 0.05, "ao_lado_frente", "Cabeca", "preto", mover_x=-0.08, mover_y=0.035, mover_z=0.07),
+        P("OlhoDireito", "esfera", 0.05, 0.05, 0.05, "ao_lado_frente", "Cabeca", "preto", mover_x=0.08, mover_y=0.035, mover_z=0.07),
+        P("Aba", "cilindro", 0.42, 0.42, 0.03, "em_cima", "Cabeca", "preto"),
+        P("Cartola", "cilindro", 0.26, 0.26, 0.3, "em_cima", "Aba", "preto"))),
+    (["robo"], F("robô", "Duas pernas, tronco quadrado, braços dos lados, cabeça com olhos e uma antena.",
+                 P("PernaEsquerda", "caixa", 0.12, 0.15, 0.5, cor="cinza", mover_x=-0.13),
+                 P("PernaDireita", "caixa", 0.12, 0.15, 0.5, cor="cinza", mover_x=0.13),
+                 P("Tronco", "caixa", 0.5, 0.3, 0.6, cor="cinza", altura_do_chao=0.5),
+                 P("BracoEsquerdo", "caixa", 0.1, 0.1, 0.5, "ao_lado_esquerda", "Tronco", "cinza", altura_do_chao=0.05),
+                 P("BracoDireito", "caixa", 0.1, 0.1, 0.5, "ao_lado_direita", "Tronco", "cinza", altura_do_chao=0.05),
+                 P("Cabeca", "caixa", 0.3, 0.25, 0.25, "em_cima", "Tronco", "cinza"),
+                 P("OlhoEsquerdo", "cilindro", 0.06, 0.06, 0.02, "ao_lado_frente", "Cabeca", "azul", deitado=True,
+                   mover_x=-0.07),
+                 P("OlhoDireito", "cilindro", 0.06, 0.06, 0.02, "ao_lado_frente", "Cabeca", "azul", deitado=True,
+                   mover_x=0.07),
+                 P("Antena", "cilindro", 0.015, 0.015, 0.12, "em_cima", "Cabeca", "preto"),
+                 P("Bolinha", "esfera", 0.04, 0.04, 0.04, "em_cima", "Antena", "vermelho"))),
+    (["peao de xadrez", "peao", "xadrez"], F(
+        "peão de xadrez", "Base redonda larga, corpo que afina para cima, uma gola e a cabeça em bola.",
+        P("Base", "cilindro", 0.04, 0.04, 0.01, cor="preto"),
+        P("Corpo", "cilindro", 0.032, 0.032, 0.04, "em_cima", "Base", "preto", topo=0.4),
+        P("Gola", "cilindro", 0.024, 0.024, 0.005, "em_cima", "Corpo", "preto"),
+        P("Cabeca", "esfera", 0.022, 0.022, 0.022, "em_cima", "Gola", "preto"))),
+    (["bola", "bola de futebol"], F("bola", "Uma esfera só.", P("Bola", "esfera", 0.22, 0.22, 0.22, cor="branco"))),
+    # --- casa e móveis sem receita ---
+    (["luminaria", "abajur", "luminaria de mesa"], F(
+        "abajur", "Base redonda, haste fina e uma cúpula clara que afina para cima.",
+        P("Base", "cilindro", 0.16, 0.16, 0.03, cor="preto"),
+        P("Haste", "cilindro", 0.02, 0.02, 0.3, "em_cima", "Base", "preto"),
+        P("Cupula", "cilindro_oco", 0.3, 0.3, 0.2, "em_cima", "Haste", "bege", topo=0.6))),
+    (["guarda-chuva", "guarda chuva", "sombrinha", "guarda-sol"], F(
+        "guarda-chuva", "Cabo fino e comprido em pé, a cobertura larga em cone baixo em cima e uma ponta.",
+        P("Cabo", "cilindro", 0.025, 0.025, 0.85, cor="preto"),
+        P("Cobertura", "cone", 1, 1, 0.3, "em_cima", "Cabo", "azul", topo=0.05),
+        P("Ponta", "cilindro", 0.015, 0.015, 0.08, "em_cima", "Cobertura", "preto"))),
+    (["sofa", "poltrona"], F(
+        "sofá", "Base baixa e larga, almofada do assento, encosto alto atrás e um braço de cada lado.",
+        P("Base", "caixa", 2, 0.9, 0.35, cor="cinza"),
+        P("Assento", "caixa", 1.6, 0.7, 0.12, "em_cima_frente", "Base", "azul"),
+        P("Encosto", "caixa", 2, 0.2, 0.45, "em_cima_tras", "Base", "cinza"),
+        P("BracoEsquerdo", "caixa", 0.2, 0.7, 0.25, "em_cima_esquerda", "Base", "cinza"),
+        P("BracoDireito", "caixa", 0.2, 0.7, 0.25, "em_cima_direita", "Base", "cinza"))),
+    (["cama", "cama de solteiro", "cama de casal"], F(
+        "cama", "Estrado de madeira, colchão branco em cima, travesseiro na cabeceira e a cabeceira alta atrás.",
+        P("Estrado", "caixa", 0.9, 1.9, 0.3, cor="madeira"),
+        P("Colchao", "caixa", 0.88, 1.88, 0.2, "em_cima", "Estrado", "branco"),
+        P("Travesseiro", "caixa", 0.6, 0.35, 0.1, "em_cima_tras", "Colchao", "azul"),
+        P("Cabeceira", "caixa", 0.9, 0.06, 0.9, "ao_lado_tras", "Estrado", "madeira", altura_do_chao=0))),
+    (["guarda-roupa", "guarda roupa", "armario", "roupeiro"], F(
+        "guarda-roupa", "Caixa alta de madeira com duas portas na frente, cada uma com um puxador.",
+        P("Corpo", "caixa", 1.2, 0.55, 2, cor="madeira"),
+        P("PortaEsquerda", "caixa", 0.59, 0.02, 1.95, "ao_lado_frente", "Corpo", "madeira_clara",
+          altura_do_chao=0.025, mover_x=-0.3),
+        P("PortaDireita", "caixa", 0.59, 0.02, 1.95, "ao_lado_frente", "Corpo", "madeira_clara",
+          altura_do_chao=0.025, mover_x=0.3),
+        P("PuxadorEsquerdo", "cilindro", 0.02, 0.02, 0.3, "ao_lado_frente", "PortaEsquerda", "preto", mover_x=0.24),
+        P("PuxadorDireito", "cilindro", 0.02, 0.02, 0.3, "ao_lado_frente", "PortaDireita", "preto", mover_x=-0.24))),
+    (["criado-mudo", "criado mudo", "mesa de cabeceira", "comoda"], F(
+        "criado-mudo", "Caixa baixa de madeira com uma gaveta na frente e um puxador redondo.",
+        P("Corpo", "caixa", 0.45, 0.4, 0.5, cor="madeira"),
+        P("Gaveta", "caixa", 0.4, 0.02, 0.15, "ao_lado_frente", "Corpo", "madeira_clara", altura_do_chao=0.3),
+        P("Puxador", "esfera", 0.03, 0.03, 0.03, "ao_lado_frente", "Gaveta", "preto"))),
+    (["banqueta", "banco", "banquinho"], F(
+        "banqueta", "Assento redondo no alto sobre quatro pernas finas.",
+        P("Assento", "cilindro", 0.35, 0.35, 0.05, cor="madeira", altura_do_chao=0.7),
+        P("Perna", "cilindro", 0.035, 0.035, 0.7, "embaixo_cantos", "Assento", "madeira"))),
+    (["escrivaninha", "mesa de escritorio"], F(
+        "escrivaninha", "Tampo apoiado num painel à esquerda e num gaveteiro à direita com três gavetas.",
+        P("Tampo", "caixa", 1.2, 0.6, 0.03, cor="madeira", altura_do_chao=0.72),
+        P("Painel", "caixa", 0.04, 0.55, 0.72, "embaixo_centro", "Tampo", "madeira", mover_x=-0.57),
+        P("Gaveteiro", "caixa", 0.4, 0.55, 0.72, "embaixo_centro", "Tampo", "madeira", mover_x=0.38),
+        P("Gaveta", "caixa", 0.36, 0.02, 0.18, "ao_lado_frente", "Gaveteiro", "madeira_clara",
+          altura_do_chao=0.06, repetir_z=3, espaco=0.05))),
+    (["relogio", "relogio de parede"], F(
+        "relógio", "Disco redondo em pé com o mostrador branco na frente e dois ponteiros.",
+        P("Aro", "cilindro", 0.3, 0.3, 0.04, cor="preto", deitado=True),
+        P("Mostrador", "cilindro", 0.27, 0.27, 0.005, "ao_lado_frente", "Aro", "branco", deitado=True),
+        P("PonteiroHoras", "caixa", 0.01, 0.004, 0.07, "ao_lado_frente", "Mostrador", "preto", mover_z=0.035),
+        P("PonteiroMinutos", "caixa", 0.1, 0.004, 0.008, "ao_lado_frente", "Mostrador", "preto", mover_x=0.05))),
+]
+
+PADRAO = ["garrafa", "carro", "boneco de neve"]  # quando nada parecido aparece no pedido

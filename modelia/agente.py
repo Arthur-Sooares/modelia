@@ -22,7 +22,7 @@ import time
 import unicodedata
 from dataclasses import dataclass, field
 
-from modelia import config, llm
+from modelia import config, llm, pecas, receitas
 from modelia.blender import AJUDANTES, FERRAMENTA_EXECUTAR, FERRAMENTAS_LEITURA
 from modelia.tarefas import TAREFAS
 
@@ -121,6 +121,10 @@ SISTEMA_DEMONSTRAR = BASE + (
     "- cone(nome, raio, altura, x=0, y=0, base=0, cor='#B8B8B8', raio_topo=0)\n"
     "- esfera(nome, raio, x=0, y=0, base=0, cor='#B8B8B8', achatar=1.0): achatar abaixo de 1 deixa mais baixa "
     "(almofada, pão, cúpula); a altura fica 2 * raio * achatar\n"
+    "- cilindro_oco(nome, raio, altura, x=0, y=0, base=0, cor='#B8B8B8', raio_topo=None): aberto em cima e "
+    "com fundo (copo, vaso, caneca, balde)\n"
+    "- alca(nome, raio, grossura, x=0, y=0, base=0, cor='#B8B8B8', giro=0): meio anel em pé que sai para +X "
+    "a partir de x; encoste x na parede da peça (alça de caneca)\n"
     "- limpar_cena(): apaga todas as malhas.\n"
     "- with ao_lado(dx, dy=0): as peças criadas dentro do bloco saem deslocadas dx em X e dy em Y.\n"
     "Medidas em metros. largura vai no eixo X, profundidade no Y, altura no Z. x e y são o centro da peça. "
@@ -194,6 +198,9 @@ def normalizar(texto):
     return sem_acento.lower().strip(" .!?")
 
 
+BLENDER_FECHADO = "blender_fechado"
+
+
 @dataclass
 class Resposta:
     """O que a interface deve mostrar depois de cada ação."""
@@ -201,6 +208,7 @@ class Resposta:
     codigo: str = ""               # preenchido quando há código esperando confirmação
     atualizar_cena: bool = False   # a interface deve pedir uma nova captura da cena
     detalhes: dict | None = None   # Verificar: {"tarefa", "nota", "certo", "falta"} para o cartão de resultado
+    problema: str = ""             # "blender_fechado": o chat mostra o passo a passo para abrir o Blender
 
 
 @dataclass
@@ -372,10 +380,10 @@ class Agente:
         except Exception as erro:
             texto = str(erro)
             self._anotar(estado, texto, tarefa=tarefa.id)
-            return Resposta(texto)
+            return Resposta(texto, problema=BLENDER_FECHADO if isinstance(erro, ConnectionError) else "")
         if not cena["malhas"]:
             texto = ("Sua cena ainda não tem nenhum objeto de malha. Comece a tarefa "
-                     f"**{tarefa.nome}** no Blender, ou use o modo **Ensinar** para ver como se faz.")
+                     f"**{tarefa.nome}** no Blender, ou use **Me ensina passo a passo** para ver como se faz.")
             self._anotar(estado, texto, tarefa=tarefa.id)
             return Resposta(texto, atualizar_cena=True)
 
@@ -420,7 +428,14 @@ class Agente:
             texto = ("O Blender não está conectado. Abra o Blender 5.1 e ligue o add-on MCP "
                      f"(porta {config.PORTA_BLENDER}).")
             self._anotar(estado, texto)
-            return Resposta(texto)
+            return Resposta(texto, problema=BLENDER_FECHADO)
+        objetos = receitas.identificar(pedido)
+        if objetos:
+            resposta = self._demonstrar_por_ficha(estado, lambda: self._fichas_das_receitas(estado, pedido, objetos))
+        else:
+            resposta = self._demonstrar_por_ficha(estado, *self._ficha_de_pecas(estado, pedido))
+        if resposta:
+            return resposta
         estado.mensagens = [
             {"role": "system", "content": SISTEMA_DEMONSTRAR},
             {"role": "user", "content": f"Pedido: {pedido}"},
@@ -488,6 +503,75 @@ class Agente:
         self._enquadrar()
         return Resposta(texto, atualizar_cena=True)
 
+    def _fichas_das_receitas(self, estado, pedido, objetos):
+        """Objeto comum (estante, mesa, cadeira): uma ficha curta por receita. Devolve (código, frase)."""
+        fichas = []
+        for receita, quantidade in objetos:
+            resposta = self.conversar(estado.modelo, receitas.mensagens_da_ficha(receita, pedido), None,
+                                      formato=receita.esquema)
+            fichas.append((receita, quantidade, receitas.ler_ficha(receita, resposta.message.content or "")))
+        return receitas.montar(fichas)
+
+    def _ficha_de_pecas(self, estado, pedido):
+        """Objeto sem receita: a LLM lista as peças e onde cada uma fica.
+
+        Devolve (preencher, corrigir): as duas devolvem (código, frase); corrigir(problemas) continua a
+        mesma conversa, mostrando à LLM o que saiu errado na cena.
+        """
+        mensagens = pecas.mensagens_da_ficha(pedido)
+
+        def preencher():
+            texto = self.conversar(estado.modelo, mensagens, None, formato=pecas.ESQUEMA).message.content or ""
+            mensagens.append({"role": "assistant", "content": texto})
+            return pecas.montar(texto)
+
+        def corrigir(problemas):
+            mensagens.append({"role": "user", "content": (
+                "Montei a sua ficha e a cena ficou com problemas:\n- " + "\n- ".join(problemas)
+                + "\nMande a ficha inteira de novo, corrigida.")})
+            return preencher()
+
+        return preencher, corrigir
+
+    def _demonstrar_por_ficha(self, estado, preencher, corrigir=None):
+        """A LLM só preenche uma ficha (JSON) e o Modelia calcula as posições e monta as peças.
+
+        Se a cena sair com problema e houver `corrigir`, a LLM recebe os problemas e manda a ficha de
+        novo (uma vez; é curta). Devolve None quando a ficha não serviu; aí o pedido segue pelo
+        caminho do código livre, como antes.
+        """
+        self._etapa("Preenchendo a ficha do objeto…")
+        try:
+            codigo, frase = preencher()
+        except ValueError:  # inclui o JSON inválido (json.JSONDecodeError)
+            return None
+        for tentativa in range(2):
+            try:
+                self._etapa("Criando no Blender…")
+                self.blender.remover_malhas_exceto(set())
+                saida, erro = self.blender.executar_com_ajudantes(codigo)
+            except Exception as falha:
+                saida, erro = str(falha), True
+            self.banco.registrar_codigo(estado.interacao["id"], codigo, "automatico", saida[:4000], erro)
+            if erro:
+                estado.interacao["erros"] += 1
+                problemas = [f"O Blender deu erro: {mensagem_de_erro(saida)}"]
+            else:
+                self._etapa("Conferindo a cena…")
+                problemas = problemas_da_cena(self.blender.medir_cena())
+            if not problemas:
+                self._anotar(estado, frase)
+                self._enquadrar()
+                return Resposta(frase + "\n\n*Veja a cena ao lado.*", atualizar_cena=True)
+            if tentativa or not corrigir:
+                return None
+            self._etapa("Corrigindo a ficha…")
+            try:
+                codigo, frase = corrigir(problemas[:8])
+            except ValueError:
+                return None
+        return None
+
     def _enquadrar(self):
         """Centraliza o objeto criado na vista do Blender (e na captura do chat). Falhar aqui não é erro."""
         try:
@@ -509,8 +593,8 @@ class Agente:
         if not estado.em_ensino and self.conhecimento is not None and self._e_duvida(estado, mensagem):
             # Dúvida no Ensinar virava um passo sem sentido; responde com o manual e mostra o modo certo.
             resposta = self._explicar(estado, mensagem)
-            resposta.texto = ("*Isso parece uma dúvida, então respondi com o manual, como no modo **Explicar**. "
-                              "No Ensinar, peça uma tarefa, por exemplo “me ensina a fazer uma mesa”.*\n\n"
+            resposta.texto = ("*Isso parece uma dúvida, então respondi com o manual, como em **Tenho uma dúvida**. "
+                              "No passo a passo, peça uma tarefa, por exemplo “me ensina a fazer uma mesa”.*\n\n"
                               + resposta.texto)
             return resposta
 
@@ -518,7 +602,7 @@ class Agente:
             texto = ("O Blender não está conectado. Abra o Blender 5.1 e ligue o add-on MCP "
                      f"(porta {config.PORTA_BLENDER}).")
             self._anotar(estado, texto)
-            return Resposta(texto)
+            return Resposta(texto, problema=BLENDER_FECHADO)
 
         if not estado.em_ensino:
             estado.mensagens = [{"role": "system", "content": SISTEMA_ENSINAR},
@@ -653,7 +737,8 @@ def com_explicacao(ferramentas):
     return resultado
 
 
-FUNCOES_PRONTAS = {"caixa", "cilindro", "cone", "esfera", "limpar_cena", "ao_lado"}
+FUNCOES_PRONTAS = {"caixa", "cilindro", "cone", "esfera", "cilindro_oco", "alca", "piramide", "telhado",
+                   "limpar_cena", "ao_lado"}
 
 
 def sem_redefinicoes(codigo):
@@ -719,6 +804,8 @@ def problemas_da_cena(cena, tol=0.02):
     ponytail: compara caixas alinhadas aos eixos; uma peça girada ocupa uma caixa maior que ela.
     """
     malhas = cena["malhas"]
+    if not malhas:
+        return ["A cena ficou vazia: nenhuma peça foi criada. Não chame limpar_cena() no fim do código."]
     problemas = []
     for m in malhas:
         if m["z_min"] < -tol:

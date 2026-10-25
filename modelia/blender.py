@@ -84,7 +84,7 @@ result = {"ok": feito}
 # modelos pequenos erravam ou esqueciam. A malha é montada direto nos dados, sem bpy.ops,
 # para não depender do contexto da interface do Blender.
 AJUDANTES = '''
-import bpy, contextlib, math
+import bpy, bmesh, contextlib, math
 
 def _cor_linear(cor):
     cor = cor.lstrip("#")
@@ -118,11 +118,17 @@ def ao_lado(dx=0, dy=0):
         _deslocamento[0] -= dx
         _deslocamento[1] -= dy
 
-def _objeto(nome, verts, faces, x, y, base, cor, chanfro, giro):
+def _objeto(nome, verts, faces, x, y, base, cor, chanfro, giro, acertar_normais=False, suave=True):
     malha = bpy.data.meshes.new(nome)
     malha.from_pydata(verts, [], faces)
+    if acertar_normais:  # malhas com parede (copo, alça): o bmesh vira as faces para fora
+        bm = bmesh.new()
+        bm.from_mesh(malha)
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        bm.to_mesh(malha)
+        bm.free()
     malha.update()
-    malha.polygons.foreach_set("use_smooth", [True] * len(malha.polygons))
+    malha.polygons.foreach_set("use_smooth", [suave] * len(malha.polygons))
     obj = bpy.data.objects.new(nome, malha)
     bpy.context.scene.collection.objects.link(obj)
     obj.location = (x + _deslocamento[0], y + _deslocamento[1], base)
@@ -168,6 +174,22 @@ def cilindro(nome, raio, altura, x=0, y=0, base=0, cor="#B8B8B8", chanfro=0.005,
 def cone(nome, raio, altura, x=0, y=0, base=0, cor="#B8B8B8", raio_topo=0.0):
     return cilindro(nome, raio, altura, x, y, base, cor, 0, raio_topo=max(raio_topo, 0.0005))
 
+def piramide(nome, largura, profundidade, altura, x=0, y=0, base=0, cor="#B8B8B8", topo=0.0):
+    """Base retangular que afina até a ponta (topo=0) ou até um retângulo menor (topo entre 0 e 1)."""
+    l, p = largura / 2, profundidade / 2
+    tl, tp = max(l * topo, 0.0005), max(p * topo, 0.0005)
+    verts = [(-l, -p, 0), (l, -p, 0), (l, p, 0), (-l, p, 0),
+             (-tl, -tp, altura), (tl, -tp, altura), (tl, tp, altura), (-tl, tp, altura)]
+    faces = [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]
+    return _objeto(nome, verts, faces, x, y, base, cor, 0, 0, acertar_normais=True, suave=False)
+
+def telhado(nome, largura, profundidade, altura, x=0, y=0, base=0, cor="#B8B8B8"):
+    """Telhado de duas águas: a cumeeira corre ao longo de X, no meio da profundidade."""
+    l, p = largura / 2, profundidade / 2
+    verts = [(-l, -p, 0), (l, -p, 0), (l, p, 0), (-l, p, 0), (-l, 0, altura), (l, 0, altura)]
+    faces = [(0, 3, 2, 1), (0, 1, 5, 4), (2, 3, 4, 5), (0, 4, 3), (1, 2, 5)]
+    return _objeto(nome, verts, faces, x, y, base, cor, 0, 0, acertar_normais=True, suave=False)
+
 def esfera(nome, raio, x=0, y=0, base=0, cor="#B8B8B8", achatar=1.0, aneis=16, lados=32):
     """achatar < 1 deixa a esfera mais baixa (almofada, cúpula); a altura fica 2 * raio * achatar."""
     verts = [(0, 0, 0)]
@@ -189,6 +211,41 @@ def esfera(nome, raio, x=0, y=0, base=0, cor="#B8B8B8", achatar=1.0, aneis=16, l
     for j in range(lados):
         faces.append((ultimo + j, ultimo + (j + 1) % lados, polo))
     return _objeto(nome, verts, faces, x, y, base, cor, 0, 0)
+
+def cilindro_oco(nome, raio, altura, x=0, y=0, base=0, cor="#B8B8B8", raio_topo=None, espessura=None, lados=32):
+    """Aberto em cima e com fundo: copo, vaso, caneca, balde, panela."""
+    topo = raio if raio_topo is None else raio_topo
+    e = espessura or max(0.003, min(raio, topo) * 0.08)
+    fundo = e * 1.5
+    def anel(r, z):
+        return [(r * math.cos(2 * math.pi * i / lados), r * math.sin(2 * math.pi * i / lados), z) for i in range(lados)]
+    verts = anel(raio, 0) + anel(topo, altura) + anel(topo - e, altura) + anel(raio - e, fundo)
+    verts += [(0, 0, 0), (0, 0, fundo)]
+    n, faces = lados, []
+    for i in range(n):
+        j = (i + 1) % n
+        faces.append((i, j, n + j, n + i))                  # parede de fora
+        faces.append((n + i, n + j, 2 * n + j, 2 * n + i))  # borda
+        faces.append((2 * n + i, 2 * n + j, 3 * n + j, 3 * n + i))  # parede de dentro
+        faces.append((3 * n + i, 3 * n + j, 4 * n + 1))     # fundo, por dentro
+        faces.append((j, i, 4 * n))                         # fundo, por fora
+    return _objeto(nome, verts, faces, x, y, base, cor, 0, 0, acertar_normais=True)
+
+def alca(nome, raio, grossura, x=0, y=0, base=0, cor="#B8B8B8", giro=0, lados=12, segmentos=16):
+    """Meio anel em pé, de x = 0 até raio + grossura e de z = 0 até 2 * (raio + grossura).
+    Com giro=0 ele sai para +X; as pontas ficam no plano x = 0, para encostar na peça ao lado."""
+    centro_z = raio + grossura
+    verts = []
+    for s in range(segmentos + 1):
+        t = -math.pi / 2 + math.pi * s / segmentos
+        px, pz = raio * math.cos(t), centro_z + raio * math.sin(t)
+        for k in range(lados):
+            f = 2 * math.pi * k / lados
+            verts.append((px + grossura * math.cos(f) * math.cos(t), grossura * math.sin(f),
+                          pz + grossura * math.cos(f) * math.sin(t)))
+    faces = [(s * lados + k, s * lados + (k + 1) % lados, (s + 1) * lados + (k + 1) % lados, (s + 1) * lados + k)
+             for s in range(segmentos) for k in range(lados)]
+    return _objeto(nome, verts, faces, x, y, base, cor, 0, giro, acertar_normais=True)
 
 def limpar_cena():
     for obj in [o for o in bpy.context.scene.objects if o.type == "MESH"]:

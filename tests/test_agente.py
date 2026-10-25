@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from modelia import agente
+from modelia import agente, receitas
 from modelia.agente import DEMONSTRAR, ENSINAR, EXPLICAR, VERIFICAR, Agente, Estado
 from modelia.banco import Banco
 
@@ -23,12 +23,16 @@ def mensagem(texto="", codigo=None, leitura=None):
 class LLMFalsa:
     """Devolve as respostas da fila, na ordem, e guarda o que recebeu."""
 
-    def __init__(self, *respostas):
+    def __init__(self, *respostas, ficha=""):
         self.fila = list(respostas)
         self.chamadas = []
+        self.ficha = ficha
 
-    def __call__(self, modelo, mensagens, ferramentas=None, opcoes=None):
+    def __call__(self, modelo, mensagens, ferramentas=None, opcoes=None, formato=None):
         # Chamadas auxiliares respondem fora da fila, para não mudar os outros testes.
+        # A ficha das receitas vem vazia, a não ser que o teste dê uma: o pedido segue pelo código livre.
+        if mensagens[0]["content"].startswith(receitas.SISTEMA):
+            return mensagem(self.ficha)
         if mensagens[0]["content"] == agente.SISTEMA_BUSCA:
             return mensagem("Termos do Blender")
         if mensagens[0]["content"] == agente.SISTEMA_TIPO:
@@ -198,7 +202,7 @@ def test_verificar_so_oferece_ferramentas_de_leitura(banco):
 def test_verificar_cena_vazia_sugere_ensinar(banco):
     ag = Agente(BlenderFalso(), None, banco, conversar=LLMFalsa())
     resposta = ag.responder(novo_estado(banco, VERIFICAR), "está certo?", tarefa_id="mesa")
-    assert "Ensinar" in resposta.texto
+    assert "passo a passo" in resposta.texto
 
 
 def test_tudo_fica_registrado_no_historico(banco):
@@ -290,6 +294,55 @@ def test_demonstrar_executa_sem_clique(banco):
     assert llm.chamadas[0]["ferramentas"] == {"execute_blender_code"}
 
 
+def test_demonstrar_por_receita_so_pede_a_ficha(banco):
+    blender = BlenderDemonstrar({"malhas": [PERNA_NO_CHAO, TAMPO], "outros": []})
+    ficha = json.dumps({"largura": 0.8, "profundidade": 0.3, "altura": 1.8, "nichos": [0.4, 0.3, 0.3],
+                        "fundo": True, "cor": "branco"})
+    llm = LLMFalsa(ficha=ficha)
+    resposta = Agente(blender, None, banco, conversar=llm).responder(
+        novo_estado(banco, DEMONSTRAR), "faça uma estante")
+    assert llm.chamadas == []  # nenhuma rodada de código livre
+    assert "LateralEsquerda" in blender.executados[0] and "Prateleira2" in blender.executados[0]
+    assert resposta.texto.startswith("Pronto! Criei uma estante de 0,80 x 0,30 x 1,80 m com 3 nichos")
+
+
+def test_demonstrar_sem_receita_usa_a_ficha_de_pecas(banco):
+    blender = BlenderDemonstrar({"malhas": [PERNA_NO_CHAO, TAMPO], "outros": []})
+    ficha = json.dumps({"objeto": "copo", "pecas": [
+        {"nome": "Corpo", "forma": "cilindro_oco", "largura": 0.07, "profundidade": 0.07, "altura": 0.12,
+         "posicao": "centro", "de": "chao", "cor": "branco"}]})
+    llm = LLMFalsa(ficha=ficha)
+    resposta = Agente(blender, None, banco, conversar=llm).responder(novo_estado(banco, DEMONSTRAR), "faça um copo")
+    assert llm.chamadas == [] and "cilindro_oco('Corpo'" in blender.executados[0]
+    assert resposta.texto.startswith("Pronto! Criei copo com 1 peça (")
+
+
+def test_demonstrar_corrige_a_ficha_com_os_problemas_da_cena(banco):
+    blender = BlenderDemonstrar({"malhas": [PERNA_FLUTUANDO], "outros": []},
+                                {"malhas": [PERNA_NO_CHAO, TAMPO], "outros": []})
+    ficha = json.dumps({"objeto": "copo", "pecas": [
+        {"nome": "Corpo", "forma": "cilindro_oco", "largura": 0.07, "profundidade": 0.07, "altura": 0.12,
+         "posicao": "centro", "de": "chao", "cor": "branco"}]})
+    vistas = []
+
+    class LLMQueGuarda(LLMFalsa):
+        def __call__(self, modelo, mensagens, ferramentas=None, opcoes=None, formato=None):
+            vistas.append(list(mensagens))
+            return super().__call__(modelo, mensagens, ferramentas, opcoes, formato)
+
+    resposta = Agente(blender, None, banco, conversar=LLMQueGuarda(ficha=ficha)).responder(
+        novo_estado(banco, DEMONSTRAR), "faça um copo")
+    assert len(blender.executados) == 2 and resposta.texto.startswith("Pronto! Criei copo")
+    assert "flutuando" in vistas[-1][-1]["content"]  # a 2ª ficha foi pedida mostrando o problema
+
+
+def test_demonstrar_ficha_invalida_segue_pelo_codigo(banco):
+    blender = BlenderDemonstrar({"malhas": [PERNA_NO_CHAO, TAMPO], "outros": []})
+    llm = LLMFalsa(mensagem("Mesa.", codigo="caixa('P', 1, 1, 1)"), ficha='{"largura": "grande"}')
+    Agente(blender, None, banco, conversar=llm).responder(novo_estado(banco, DEMONSTRAR), "crie uma mesa")
+    assert blender.executados == ["caixa('P', 1, 1, 1)"]
+
+
 def test_demonstrar_corrige_peca_flutuando(banco):
     blender = BlenderDemonstrar({"malhas": [PERNA_FLUTUANDO], "outros": []},
                                 {"malhas": [PERNA_NO_CHAO, TAMPO], "outros": []})
@@ -335,9 +388,9 @@ def test_experimento_modelia_usa_o_demonstrar_com_a_mesma_seed(banco):
     blender.abrir_cena = lambda caminho: None
     llm = LLMFalsa(mensagem("Mesa pronta.", codigo="caixa('P', 1, 1, 1)"))
     opcoes_vistas = []
-    def conversar(modelo, mensagens, ferramentas=None, opcoes=None):
+    def conversar(modelo, mensagens, ferramentas=None, opcoes=None, **extras):
         opcoes_vistas.append(opcoes)
-        return llm(modelo, mensagens, ferramentas, opcoes)
+        return llm(modelo, mensagens, ferramentas, opcoes, **extras)
 
     linha = experimento.executar_uma(blender, "falso", tarefas.TAREFAS["mesa"], 7, 0.3,
                                      experimento.MODELIA, banco, conversar)
@@ -427,7 +480,8 @@ def test_demonstrar_avisa_as_etapas(banco):
     etapas = []
     Agente(blender, None, banco, conversar=llm).responder(
         novo_estado(banco, DEMONSTRAR), "crie uma mesa", ao_avisar=etapas.append)
-    assert etapas == ["Planejando as peças…", "Criando no Blender…", "Conferindo a cena…",
+    # "mesa" tem receita: primeiro a ficha (que veio vazia), depois o código livre
+    assert etapas == ["Preenchendo a ficha do objeto…", "Planejando as peças…", "Criando no Blender…", "Conferindo a cena…",
                       "Corrigindo o objeto (tentativa 2 de 3)…", "Criando no Blender…", "Conferindo a cena…"]
 
 
@@ -495,3 +549,11 @@ def test_codigo_solto_sem_bloco_tambem_vale():
     assert codigo == "import bpy\nbpy.ops.mesh.primitive_plane_add(size=2)"
     assert explicacao == "Vou criar a base.\nPasso 1, code:"
     assert agente.codigo_no_texto("Use import bpy no começo.") == (None, "Use import bpy no começo.")
+
+
+def test_blender_fechado_avisa_o_chat(banco):
+    blender = BlenderFalso()
+    blender.disponivel = lambda: False
+    ag = Agente(blender, None, banco, conversar=LLMFalsa())
+    resposta = ag.responder(novo_estado(banco, DEMONSTRAR), "faz uma cadeira")
+    assert resposta.problema == "blender_fechado" and "Blender" in resposta.texto
