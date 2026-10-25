@@ -216,8 +216,9 @@ def test_tudo_fica_registrado_no_historico(banco):
     assert linhas[0]["modo"] == ENSINAR and linhas[0]["codigo_executado"] == "passo1"
 
 
-def test_explicar_llm_diz_que_nao_sabe(banco):
-    llm = LLMFalsa(mensagem("NAO_SEI"))
+@pytest.mark.parametrize("recusa", ["NAO_SEI", "NÃO_SEI", "NAO SEI."])
+def test_explicar_llm_diz_que_nao_sabe(banco, recusa):
+    llm = LLMFalsa(mensagem(recusa))
     trechos = [{"texto": "Subdivision Surface.", "titulo": "Manual", "fonte": "", "distancia": 0.3}]
     ag = Agente(BlenderFalso(), ConhecimentoFalso(trechos), banco, conversar=llm)
     resposta = ag.responder(novo_estado(banco, EXPLICAR), "como faço uma mesa?")

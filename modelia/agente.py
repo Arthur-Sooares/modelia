@@ -354,7 +354,7 @@ class Agente:
         ]
         # Neste modo a LLM não recebe nenhuma ferramenta (RF4).
         resposta = self._falar(estado).message.content or ""
-        if NAO_SEI in resposta:
+        if "nao_sei" in normalizar(resposta).replace(" ", "_"):  # o qwen às vezes escreve NÃO_SEI, com acento
             return self._nao_coberto(estado)
         fontes = sorted({f"{t['titulo']}" + (f" ({t['fonte']})" if t["fonte"] else "") for t in trechos})
         texto = resposta.strip() + "\n\n**Fontes:** " + "; ".join(fontes)
