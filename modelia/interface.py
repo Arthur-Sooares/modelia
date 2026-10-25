@@ -16,12 +16,13 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from modelia import config, experimento, llm
+from modelia import config, experimento, llm, preparar
 from modelia.agente import DEMONSTRAR, ENSINAR, EXPLICAR, MODOS, VERIFICAR, Agente, Estado
 from modelia.api import criar_api
 from modelia.banco import Banco, para_csv
 from modelia.blender import Blender
 from modelia.conhecimento import Conhecimento
+from modelia.pesquisador import criar_api_pesquisador
 from modelia.tarefas import TAREFAS
 
 AJUDA_MODOS = {
@@ -86,7 +87,7 @@ def criar_app(servicos=None):
     def comecar(identificador, eh_pesquisador, senha):
         perfil = "estudante"
         if eh_pesquisador:
-            if senha != config.SENHA_PESQUISADOR:
+            if config.SENHA_PESQUISADOR and senha != config.SENHA_PESQUISADOR:
                 raise gr.Error("Senha do Pesquisador incorreta.")
             perfil = "pesquisador"
         try:
@@ -467,19 +468,32 @@ def criar_app(servicos=None):
 
 
 def criar_servidor():
-    """A home e o chat (site/) em "/", a API do chat em "/api" e o app em Gradio em "/app"."""
+    """A home, o chat e as telas do Pesquisador (site/) em "/", as APIs em "/api" e o app antigo em Gradio em "/app"."""
     servicos = Servicos()
     servidor = FastAPI()
     servidor.include_router(criar_api(servicos))
+    servidor.include_router(criar_api_pesquisador(servicos))
     gr.mount_gradio_app(servidor, criar_app(servicos), path="/app", footer_links=[],
                         allowed_paths=[str(config.PASTA_RESULTADOS)])
     servidor.mount("/", StaticFiles(directory=PASTA_SITE, html=True), name="site")  # por último: pega o resto
     return servidor
 
 
+def ligar_e_aquecer():
+    """Liga o Ollama se ele estiver instalado e fechado, e já carrega o modelo padrão."""
+    config.PREPARANDO.set()
+    try:
+        if preparar.ligar_ollama():
+            llm.aquecer(config.MODELO_PADRAO)
+    finally:
+        config.PREPARANDO.clear()
+
+
 def iniciar():
     # RNF1 e RNF2: só no endereço local, sem link público.
     endereco = f"http://127.0.0.1:{config.PORTA}/"
-    threading.Timer(1.5, webbrowser.open, [endereco]).start()
-    threading.Thread(target=llm.aquecer, args=(config.MODELO_PADRAO,), daemon=True).start()
+    if config.ABRIR_NAVEGADOR:
+        threading.Timer(1.5, webbrowser.open, [endereco]).start()
+    config.PREPARANDO.set()  # antes do servidor subir: a primeira consulta do chat já vê "abrindo"
+    threading.Thread(target=ligar_e_aquecer, daemon=True).start()
     uvicorn.run(criar_servidor(), host=config.HOST, port=config.PORTA)

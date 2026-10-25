@@ -28,9 +28,23 @@ def modelos():
     return sorted(lista, key=lambda m: m["modificado"], reverse=True)
 
 
+_capacidades = {}  # nome -> lista do Ollama; só guarda quando a consulta deu certo
+
+
+def usa_ferramentas(nome):
+    """Se o modelo sabe chamar ferramentas (tool calling). O Modelia precisa disso para mexer no Blender:
+    o gemma3, por exemplo, não sabe, e o Ollama recusa o pedido com erro 400."""
+    if nome not in _capacidades:
+        try:
+            _capacidades[nome] = cliente.show(nome).capabilities or []
+        except Exception:
+            return False
+    return "tools" in _capacidades[nome]
+
+
 def modelos_de_chat():
-    """Só os modelos que conversam (tira os de embeddings, que não servem para o chat)."""
-    return [m["nome"] for m in modelos() if "embed" not in m["nome"]]
+    """Só os modelos que servem para o chat: sabem chamar ferramentas (tira os de embeddings e os sem tools)."""
+    return [m["nome"] for m in modelos() if "embed" not in m["nome"] and usa_ferramentas(m["nome"])]
 
 
 def cabe_na_vram(tamanho_gb, vram_gb=config.VRAM_GB):
@@ -42,13 +56,19 @@ def baixar(nome):
     """Baixa um modelo. É um gerador: devolve (fração de 0 a 1, texto do status) enquanto baixa."""
     for parte in cliente.pull(nome.strip(), stream=True):
         if parte.total:
-            yield (parte.completed or 0) / parte.total, parte.status
+            feito = parte.completed or 0
+            yield feito / parte.total, f"Baixando… {feito / 1e9:.1f} de {parte.total / 1e9:.1f} GB".replace(".", ",")
         else:
             yield None, parte.status
 
 
 def apagar(nome):
     cliente.delete(nome)
+
+
+def vram_em_uso():
+    """GB de VRAM ocupados agora pelos modelos carregados no Ollama."""
+    return round(sum(m.size_vram or 0 for m in cliente.ps().models) / 1e9, 1)
 
 
 def opcoes_de(modelo, opcoes=None):
@@ -68,16 +88,19 @@ def aquecer(modelo):
         return False  # Ollama desligado ou modelo não instalado: a primeira pergunta carrega, como antes.
 
 
-def conversar(modelo, mensagens, ferramentas=None, opcoes=None, ao_escrever=None):
+def conversar(modelo, mensagens, ferramentas=None, opcoes=None, ao_escrever=None, formato=None):
     """Uma rodada de conversa. Desliga o modo "pensar" quando o modelo aceita (fica mais rápido).
 
     Com `ao_escrever`, a resposta vem aos pedaços (streaming): a função recebe o texto escrito
-    até agora a cada pedaço, e no fim volta a mesma resposta completa de sempre."""
+    até agora a cada pedaço, e no fim volta a mesma resposta completa de sempre.
+    Com `formato` (um esquema JSON), o Ollama só deixa o modelo escrever um JSON nesse formato."""
     opcoes = opcoes_de(modelo, opcoes)
     argumentos = {"model": modelo, "messages": mensagens, "options": opcoes,
                   "keep_alive": config.MANTER_CARREGADO}
     if ferramentas:
         argumentos["tools"] = ferramentas
+    if formato:
+        argumentos["format"] = formato
 
     def chamar(**extras):
         if not ao_escrever:

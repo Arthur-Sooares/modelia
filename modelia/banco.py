@@ -150,6 +150,19 @@ class Banco:
             parametros,
         )
 
+    def tempo_tipico(self, modelo, ultimas=20):
+        """Mediana dos segundos das últimas respostas de cada modo com este modelo, para o chat estimar a espera
+        neste computador. Modos sem histórico ficam de fora."""
+        tempos = {}
+        for linha in self._consultar(
+            "SELECT modo, segundos FROM interacoes WHERE modelo = ? AND resposta IS NOT NULL AND segundos > 0 "
+            "ORDER BY id DESC", (modelo,),
+        ):
+            lista = tempos.setdefault(linha["modo"], [])
+            if len(lista) < ultimas:
+                lista.append(linha["segundos"])
+        return {modo: sorted(lista)[len(lista) // 2] for modo, lista in tempos.items()}
+
     def estudantes(self):
         return [linha["identificador"] for linha in self._consultar(
             "SELECT identificador FROM estudantes ORDER BY identificador")]

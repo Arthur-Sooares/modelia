@@ -5,6 +5,7 @@ Os valores podem ser trocados por variáveis de ambiente, sem mexer no código.
 
 import os
 import sys
+import threading
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -22,10 +23,25 @@ PORTA = 7860
 
 # RNF3: LLM local pelo Ollama.
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
-MODELO_PADRAO = os.environ.get("MODELIA_MODELO", "gemma4:12b-it-qat")
+# qwen3.5:4b roda em qualquer placa com 4 GB; o gemma4 (só para o experimento) pede 6 GB.
+# O Pesquisador pode trocar na tela Modelos ("Usar como padrão"); a escolha fica neste arquivo.
+ARQUIVO_MODELO_PADRAO = PASTA_DADOS / "modelo_padrao.txt"
+_SALVO = ARQUIVO_MODELO_PADRAO.read_text(encoding="utf-8").strip() if ARQUIVO_MODELO_PADRAO.exists() else ""
+MODELO_PADRAO = os.environ.get("MODELIA_MODELO") or _SALVO or "qwen3.5:4b"
 # Multilíngue: no manual do Blender em português acertou o trecho certo (top-3) em 14 de 15 perguntas,
 # contra 6 de 15 do nomic-embed-text, que é treinado quase só em inglês (medido em 18/10/2026).
 MODELO_EMBEDDINGS = "qwen3-embedding:0.6b"
+# O que a tela de instalação baixa num computador novo.
+MODELOS_NECESSARIOS = [MODELO_PADRAO, MODELO_EMBEDDINGS]
+
+
+def salvar_modelo_padrao(nome):
+    """Troca o modelo padrão do chat agora e nas próximas vezes que o Modelia abrir."""
+    global MODELO_PADRAO, MODELOS_NECESSARIOS
+    PASTA_DADOS.mkdir(parents=True, exist_ok=True)
+    ARQUIVO_MODELO_PADRAO.write_text(nome, encoding="utf-8")
+    MODELO_PADRAO = nome
+    MODELOS_NECESSARIOS = [MODELO_PADRAO, MODELO_EMBEDDINGS]
 OPCOES_LLM = {"temperature": 0.6, "num_ctx": 8192}
 # Quanto tempo o Ollama mantém o modelo na VRAM depois da última pergunta (o padrão dele é 5 min).
 # Carregar de novo custa ~1 min (medido em 18/10/2026 com o qwen3.5:4b).
@@ -44,8 +60,14 @@ MCP_PYTHON = os.environ.get("MODELIA_MCP_PYTHON", sys.executable)
 MCP_ARGS = ["-m", "blmcp"]
 PORTA_BLENDER = 9876
 
-# RF3, RF8, RF9, RF10: abas restritas ao Pesquisador.
-SENHA_PESQUISADOR = os.environ.get("MODELIA_SENHA", "modelia")
+# RF3, RF8, RF9, RF10: telas do Pesquisador. Abertas por padrão (o link fica na lateral do chat);
+# com MODELIA_SENHA definida, pedem a senha (útil com MODELIA_HOST=0.0.0.0 numa rede compartilhada).
+SENHA_PESQUISADOR = os.environ.get("MODELIA_SENHA", "")
+
+# Ligado enquanto o Modelia liga o Ollama e carrega o modelo, logo depois de abrir (interface.ligar_e_aquecer).
+PREPARANDO = threading.Event()
+# O atalho da área de trabalho abre a própria tela "Abrindo o Modelia…"; aí o servidor não abre o navegador.
+ABRIR_NAVEGADOR = os.environ.get("MODELIA_SEM_NAVEGADOR", "") != "1"
 
 # RF6: tentativas de correção depois de um erro do Blender, por passo.
 MAX_TENTATIVAS = 3

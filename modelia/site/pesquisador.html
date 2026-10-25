@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Modelia · pesquisador</title>
+  <link rel="icon" href="img/marca.svg">
+  <link rel="stylesheet" href="base.css">
+  <link rel="stylesheet" href="chat.css">
+  <link rel="stylesheet" href="pesquisador.css">
+</head>
+<body>
+<a class="pular" href="#pagina">Pular para o conteúdo</a>
+
+<aside class="lateral" id="lateral">
+  <a class="marca" href="/"><span class="marca-m">m</span>modelia</a>
+  <a class="nova" href="chat.html#nova"><span>+</span>Nova conversa</a>
+
+  <nav class="grupo" aria-label="Modo">
+    <p class="grupo-titulo">Modo</p>
+    <a class="item" href="chat.html#Explicar"><img src="img/ponto-azul-8.svg" alt="">Explicar</a>
+    <a class="item" href="chat.html#Ensinar"><img src="img/ponto-laranja-8.svg" alt="">Ensinar</a>
+    <a class="item" href="chat.html#Demonstrar"><img src="img/ponto-tinta-8.svg" alt="">Demonstrar</a>
+    <a class="item" href="chat.html#Verificar"><img src="img/ponto-verde-8.svg" alt="">Verificar</a>
+  </nav>
+
+  <nav class="grupo" aria-label="Pesquisador">
+    <p class="grupo-titulo">Pesquisador</p>
+    <a class="item" href="#modelos">Modelos</a>
+    <a class="item" href="#conhecimento">Conhecimento</a>
+    <a class="item" href="#historico">Histórico</a>
+    <a class="item" href="#experimento">Experimento</a>
+    <a class="item" href="#instalacao">Instalação</a>
+  </nav>
+
+  <div class="espaco"></div>
+  <div class="participante">
+    <span class="avatar laranja-fundo">P</span>
+    <div>
+      <p class="participante-nome">Pesquisador</p>
+      <p class="estados">
+        <span id="estado-ollama"><img src="img/ponto-verde-7.svg" alt="">Ollama</span>
+        <span id="estado-blender"><img src="img/ponto-verde-7.svg" alt="">Blender</span>
+      </p>
+    </div>
+  </div>
+</aside>
+
+<main class="pagina" id="pagina" tabindex="-1">
+  <button class="menu" id="menu" type="button" aria-label="Abrir menu" aria-controls="lateral">☰</button>
+
+  <!-- 8 · Modelos -->
+  <section class="tela" id="modelos" hidden>
+    <header class="cabeca">
+      <div>
+        <h1>Modelos</h1>
+        <p class="sub" id="modelos-sub">LLMs instaladas no Ollama deste computador.</p>
+      </div>
+    </header>
+    <div id="modelos-aviso"></div>
+    <div class="cartao vram" id="modelos-vram"></div>
+    <h2>Instalados</h2>
+    <div class="tabela" id="modelos-instalados"></div>
+    <div class="titulo-linha">
+      <h2>Baixar modelos</h2>
+      <form class="em-linha" id="form-baixar">
+        <label class="sr" for="nome-modelo">Nome do modelo</label>
+        <input class="campo" id="nome-modelo" aria-label="Nome do modelo no Ollama" placeholder="Outro modelo, ex.: mistral:7b…" autocomplete="off">
+        <button class="botao laranja" type="submit">Baixar</button>
+      </form>
+    </div>
+    <div class="grade" id="modelos-sugestoes"></div>
+  </section>
+
+  <!-- 9 · Conhecimento -->
+  <section class="tela" id="conhecimento" hidden>
+    <header class="cabeca">
+      <div>
+        <h1>Conhecimento</h1>
+        <p class="sub">Material que o modo Explicar usa para responder, com a fonte citada.</p>
+      </div>
+    </header>
+    <form class="envio" id="form-documento">
+      <label class="soltar" id="soltar">
+        <input type="file" id="arquivo" accept=".pdf,.md,.txt" class="sr">
+        <span class="soltar-icone" aria-hidden="true">↑</span>
+        <strong id="soltar-nome">Arraste um arquivo ou clique para escolher</strong>
+        <span class="obs">PDF, Markdown ou texto</span>
+      </label>
+      <div class="campos">
+        <label>Título<input class="campo" id="titulo" placeholder="Ex.: Apostila de Modelagem 3D"></label>
+        <span class="obs">Aparece como fonte nas respostas.</span>
+        <label>Fonte<input class="campo" id="fonte" placeholder="Ex.: Prof. Helder, 2026"></label>
+        <button class="botao laranja largo" type="submit">Adicionar</button>
+      </div>
+    </form>
+    <div id="manual-cartao"></div>
+    <div id="documento-progresso"></div>
+    <h2>Documentos</h2>
+    <div class="tabela" id="documentos"></div>
+    <p class="obs">Uma resposta só usa trechos com distância até 0,5 da pergunta. Acima disso, o Modelia diz que o
+      material não cobre a pergunta.</p>
+  </section>
+
+  <!-- 10 · Histórico -->
+  <section class="tela" id="historico" hidden>
+    <header class="cabeca">
+      <div>
+        <h1>Histórico</h1>
+        <p class="sub">Todas as interações dos participantes, para a análise do TCC.</p>
+      </div>
+      <button class="botao laranja" id="exportar" type="button">Exportar CSV</button>
+    </header>
+    <form class="filtros" id="form-filtros">
+      <label>Participante<select class="campo" id="f-estudante"><option value="">Todos</option></select></label>
+      <label>Modo<select class="campo" id="f-modo"><option value="">Todos</option></select></label>
+      <label>De<input class="campo" type="date" id="f-desde"></label>
+      <label>Até<input class="campo" type="date" id="f-ate"></label>
+      <button class="botao cinza" type="submit">Filtrar</button>
+    </form>
+    <div class="contadores" id="contadores"></div>
+    <div class="tabela" id="interacoes"></div>
+  </section>
+
+  <!-- 11 · Experimento -->
+  <section class="tela" id="experimento" hidden>
+    <header class="cabeca">
+      <div>
+        <h1>Experimento</h1>
+        <p class="sub">Bateria de tarefas para comparar as LLMs. Cada execução parte da cena base limpa.</p>
+      </div>
+      <div class="acoes">
+        <button class="botao contorno" id="cena-base" type="button">Criar cena base</button>
+        <button class="botao perigo" id="parar" type="button">Parar</button>
+      </div>
+    </header>
+    <div class="duas-colunas">
+      <form class="cartao formulario" id="form-experimento">
+        <fieldset><legend>Modelos</legend><div class="fichas" id="exp-modelos"></div></fieldset>
+        <fieldset><legend>Tarefas (nota automática de 0 a 3)</legend><div class="fichas" id="exp-tarefas"></div></fieldset>
+        <fieldset><legend>Condições</legend><div class="fichas" id="exp-condicoes"></div></fieldset>
+        <div class="par">
+          <label>Repetições<input class="campo mono" type="number" id="exp-repeticoes" value="3" min="1"></label>
+          <label>Seeds<input class="campo mono" id="exp-seeds" value="1, 2, 3"></label>
+        </div>
+        <label class="temperatura">
+          <span>Temperatura <output class="mono laranja-escuro" id="exp-temperatura-valor">0,6</output></span>
+          <input type="range" id="exp-temperatura" min="0" max="1.5" step="0.1" value="0.6">
+        </label>
+        <p class="previstas">Execuções previstas <strong id="exp-previstas">0</strong></p>
+        <button class="botao laranja largo" type="submit" id="iniciar">Iniciar experimento</button>
+        <p class="obs laranja-escuro">Ao iniciar, você autoriza o Modelia a executar o código gerado sem pedir
+          confirmação, só durante o experimento.</p>
+      </form>
+      <div class="coluna">
+        <div id="exp-progresso"></div>
+        <div class="tabela" id="exp-linhas"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12 · Instalação -->
+  <section class="tela" id="instalacao" hidden>
+    <header class="cabeca">
+      <div>
+        <h1>Instalação</h1>
+        <p class="sub" id="instalacao-sub">O que o Modelia precisa neste computador. É só uma vez: o que já está pronto
+          fica marcado.</p>
+      </div>
+      <button class="botao cinza" id="verificar" type="button">Verificar de novo</button>
+    </header>
+    <div class="etapas" id="etapas"></div>
+    <div class="rodape-etapas" id="instalacao-rodape"></div>
+    <p class="obs">Os modelos ficam na pasta do Ollama (variável OLLAMA_MODELS). O manual e o índice ficam em dados/,
+      dentro da pasta do Modelia.</p>
+    <input type="file" id="zip-manual" accept=".zip" class="sr">
+  </section>
+</main>
+
+<dialog class="entrar" id="entrar">
+  <form method="dialog" id="form-entrar">
+    <h2>Área do Pesquisador</h2>
+    <p class="sub">Modelos, conhecimento, histórico e experimento são só para o Pesquisador.</p>
+    <label>Senha<input class="campo" type="password" id="senha" autocomplete="current-password" required></label>
+    <p class="erro" id="senha-erro" hidden>Senha incorreta.</p>
+    <div class="acoes">
+      <a class="botao cinza" href="chat.html">Voltar ao chat</a>
+      <button class="botao laranja" type="submit">Entrar</button>
+    </div>
+  </form>
+</dialog>
+
+<p class="toast" id="toast" role="status" hidden></p>
+
+<script src="pesquisador.js"></script>
+</body>
+</html>

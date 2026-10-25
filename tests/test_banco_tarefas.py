@@ -61,3 +61,12 @@ def test_dividir_respeita_tamanho():
     trechos = dividir(texto, tamanho=500, sobreposicao=50)
     assert all(len(t) <= 500 for t in trechos)
     assert sum(t.count("x") for t in trechos) >= 3000
+
+
+def test_tempo_tipico_por_modo_e_modelo(banco):
+    sessao = banco.iniciar_sessao("P01")
+    for modo, modelo, segundos in [("Demonstrar", "m", 100), ("Demonstrar", "m", 300), ("Demonstrar", "m", 200),
+                                   ("Explicar", "m", 10), ("Demonstrar", "outro", 900)]:
+        banco.concluir_interacao(banco.registrar_interacao(sessao, modo, modelo, "faz"), "ok", segundos)
+    banco.registrar_interacao(sessao, "Ensinar", "m", "sem resposta ainda")  # não entra na conta
+    assert banco.tempo_tipico("m") == {"Demonstrar": 200, "Explicar": 10}
