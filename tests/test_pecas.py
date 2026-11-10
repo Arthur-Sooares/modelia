@@ -91,3 +91,10 @@ def test_exemplos_para_poe_o_mais_parecido_por_ultimo():
     assert exemplos_para("faça uma casinha de cachorro")[-1]["objeto"] == "casinha de cachorro"
     assert exemplos_para("quero um copo grande")[-1]["objeto"] == "copo"
     assert len(exemplos_para("um dragão")) == 3  # nada parecido: exemplos variados
+
+
+def test_mais_parecidas_poe_a_mais_parecida_por_ultimo():
+    from modelia.avaliacao_fichas import mais_parecidas
+
+    vetores = [[1, 0], [0, 1], [0.9, 0.1], [-1, 0]]
+    assert mais_parecidas([1, 0], vetores, 2) == [2, 0]

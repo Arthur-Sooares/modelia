@@ -118,9 +118,10 @@ def exemplos_para(pedido, quantos=3):
     return list(reversed(escolhidos))
 
 
-def mensagens_da_ficha(pedido):
+def mensagens_da_ficha(pedido, fichas=None):
+    """`fichas`: os exemplos a mostrar; sem ele, os escolhidos por nome (exemplos_para)."""
     exemplos = "\n".join(f"Exemplo, {f['objeto']}:\n" + json.dumps(f, ensure_ascii=False, separators=(",", ":"))
-                         for f in exemplos_para(pedido))
+                         for f in (fichas if fichas is not None else exemplos_para(pedido)))
     return [{"role": "system", "content": SISTEMA + FICHA + "\n" + exemplos},
             {"role": "user", "content": f"Pedido: {pedido}"}]
 
