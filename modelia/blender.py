@@ -383,8 +383,14 @@ class Blender:
         return self.rodar_codigo_interno(CODIGO_ENQUADRAR)
 
     def executar_com_ajudantes(self, codigo):
-        """Modo Demonstrar: o código da LLM roda depois das funções prontas (AJUDANTES)."""
+        """Ensinar e Demonstrar: o código da LLM roda depois das funções prontas (AJUDANTES)."""
         return self.executar(AJUDANTES + codigo)
+
+    def operadores(self):
+        """{módulo: [operadores]} de bpy.ops, para o validador barrar operador inventado pela LLM."""
+        return self.rodar_codigo_interno(
+            "import bpy\nresult = {m: [o for o in dir(getattr(bpy.ops, m)) if not o.startswith('_')]"
+            " for m in dir(bpy.ops) if not m.startswith('_')}")
 
     def remover_malhas_exceto(self, nomes):
         """Desfaz uma tentativa do Demonstrar: apaga as malhas que não estavam na cena antes."""

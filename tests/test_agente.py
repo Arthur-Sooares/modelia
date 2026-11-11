@@ -47,6 +47,7 @@ class BlenderFalso:
         self.executados = []
         self.erros = erros
         self.cena = cena or {"malhas": [], "outros": []}
+        self.removidos = []
 
     def disponivel(self):
         return True
@@ -60,6 +61,12 @@ class BlenderFalso:
             self.erros -= 1
             return json.dumps({"status": "error", "message": "NameError: bpyy"}), True
         return json.dumps({"status": "ok", "result": None}), False
+
+    def executar_com_ajudantes(self, codigo):
+        return self.executar(codigo)
+
+    def remover_malhas_exceto(self, nomes):
+        self.removidos.append(set(nomes))
 
     def chamar(self, nome, argumentos):
         return json.dumps({"status": "ok", "result": {"objetos": []}}), False
@@ -259,16 +266,9 @@ class BlenderDemonstrar(BlenderFalso):
     def __init__(self, *cenas, erros=0):
         super().__init__(erros=erros)
         self.cenas = list(cenas)
-        self.removidos = []
 
     def medir_cena(self):
         return self.cenas.pop(0)
-
-    def executar_com_ajudantes(self, codigo):
-        return self.executar(codigo)
-
-    def remover_malhas_exceto(self, nomes):
-        self.removidos.append(set(nomes))
 
     def enquadrar(self):
         self.enquadrado = True
@@ -548,7 +548,7 @@ def test_codigo_solto_sem_bloco_tambem_vale():
              "Depois aperte S para escalar.")
     codigo, explicacao = agente.codigo_no_texto(texto)
     assert codigo == "import bpy\nbpy.ops.mesh.primitive_plane_add(size=2)"
-    assert explicacao == "Vou criar a base.\nPasso 1, code:"
+    assert explicacao == "Vou criar a base."  # o rótulo "Passo 1, code:" não aparece para o aluno
     assert agente.codigo_no_texto("Use import bpy no começo.") == (None, "Use import bpy no começo.")
 
 
@@ -558,3 +558,87 @@ def test_blender_fechado_avisa_o_chat(banco):
     ag = Agente(blender, None, banco, conversar=LLMFalsa())
     resposta = ag.responder(novo_estado(banco, DEMONSTRAR), "faz uma cadeira")
     assert resposta.problema == "blender_fechado" and "Blender" in resposta.texto
+
+
+# --- Ensinar com as funções prontas, validador e pergunta de apagar a cena (11/11/2026) ---
+
+CUBO_PADRAO = {"nome": "Cube", "dim": [2.0, 2.0, 2.0], "local": [0, 0, 0], "z_min": -1.0, "z_max": 1.0,
+               "xy": [-1, 1, -1, 1]}
+
+
+def test_validar_barra_operador_inventado():
+    operadores = {"mesh": ["primitive_cube_add"], "transform": ["translate"]}
+    codigo = ("import bpy\nbpy.ops.mesh.primitive_cube_add()\nbpy.ops.transform.move(value=1)\n"
+              "bpy.ops.mesh.primitive_animal_add()\nbpy.ops.inventado.qualquer()")
+    problemas = agente.validar(codigo, operadores)
+    assert len(problemas) == 3
+    assert "transform.move" in problemas[0] and "primitive_animal_add" in problemas[1]
+    assert agente.validar(codigo) == []  # sem a lista do Blender, não confere
+
+
+def test_ensinar_nao_mostra_codigo_invalido_e_pede_correcao(banco):
+    blender = BlenderFalso()
+    blender.operadores = lambda: {"transform": ["translate"]}
+    llm = LLMFalsa(mensagem("Movo a perna.", codigo="import bpy\nbpy.ops.transform.move(value=1)"),
+                   mensagem("Movo a perna.", codigo="caixa('Perna', 0.06, 0.06, 0.7)"))
+    ag = Agente(blender, None, banco, conversar=llm)
+    resposta = ag.responder(novo_estado(banco, ENSINAR), "faça uma mesa")
+    assert resposta.codigo == "caixa('Perna', 0.06, 0.06, 0.7)"
+    assert "não existe" in llm.chamadas[1]["mensagens"][-1]["content"]
+
+
+def test_ensinar_pergunta_antes_de_apagar_a_cena(banco):
+    blender = BlenderFalso(cena={"malhas": [CUBO_PADRAO], "outros": []})
+    llm = LLMFalsa(mensagem("Passo 1", codigo="caixa('Tampo', 1, 1, 0.04)"))
+    ag = Agente(blender, None, banco, conversar=llm)
+    estado = novo_estado(banco, ENSINAR)
+
+    resposta = ag.responder(estado, "me ensina a fazer uma mesa")
+    assert "Cube" in resposta.texto and "apague" in resposta.texto
+    assert llm.chamadas == [] and blender.removidos == []
+
+    resposta = ag.responder(estado, "Sim, pode apagar")
+    assert blender.removidos == [set()]
+    assert resposta.texto.startswith("*Apaguei") and resposta.codigo == "caixa('Tampo', 1, 1, 0.04)"
+    assert llm.chamadas[0]["mensagens"][1]["content"] == "me ensina a fazer uma mesa"
+
+
+def test_ensinar_nao_apaga_a_cena_se_o_aluno_disser_nao(banco):
+    blender = BlenderFalso(cena={"malhas": [CUBO_PADRAO], "outros": []})
+    llm = LLMFalsa(mensagem("Passo 1", codigo="c1"))
+    ag = Agente(blender, None, banco, conversar=llm)
+    estado = novo_estado(banco, ENSINAR)
+    ag.responder(estado, "me ensina a fazer uma mesa")
+    resposta = ag.responder(estado, "não")
+    assert blender.removidos == [] and resposta.codigo == "c1"
+    assert "já tem Cube" in llm.chamadas[0]["mensagens"][1]["content"]
+
+
+def test_ensinar_avisa_peca_errada_depois_do_passo(banco):
+    blender = BlenderFalso()
+    llm = LLMFalsa(mensagem("Passo 1", codigo="c1"))
+    ag = Agente(blender, None, banco, conversar=llm)
+    estado = novo_estado(banco, ENSINAR)
+    ag.responder(estado, "faça uma mesa")  # cena vazia: não pergunta nada
+    blender.cena = {"malhas": [CUBO_PADRAO], "outros": []}
+    resposta = ag.executar(estado)
+    assert "abaixo do chão" in resposta.texto
+    assert "PROBLEMAS" in estado.mensagens[-1]["content"]
+
+
+def test_pecas_que_so_se_apoiam_entre_si_flutuam():
+    # Rodada real do qwen3.5:4b: pernas subidas para 0,75 m, tampo também a 0,75 m.
+    pernas = {**PERNA_NO_CHAO, "z_min": 0.75, "z_max": 1.5}
+    tampo = {**TAMPO, "z_min": 0.75, "z_max": 0.77}
+    problemas = agente.problemas_da_cena({"malhas": [pernas, tampo], "outros": []})
+    assert len(problemas) == 2 and all("flutuando" in p for p in problemas)
+    assert agente.problemas_da_cena({"malhas": [PERNA_NO_CHAO, TAMPO], "outros": []}) == []
+
+
+def test_codigo_depois_de_code_tambem_vale():
+    texto = ("Vamos fazer as pernas.\nPasso 1, explicacao: Crio as pernas. À mão: Shift+A.\nPasso 1, code:\n"
+             "caixa('Perna', 0.06, 0.06, 0.7)\n\nDepois fazemos o tampo.")
+    codigo, resto = agente.codigo_no_texto(texto)
+    assert codigo == "caixa('Perna', 0.06, 0.06, 0.7)"
+    assert resto == "Vamos fazer as pernas.\nCrio as pernas. À mão: Shift+A."
+    assert agente.codigo_no_texto("O code: abaixo\nsó texto")[0] is None

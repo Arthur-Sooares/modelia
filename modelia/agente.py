@@ -78,41 +78,8 @@ SISTEMA_EXPLICAR = BASE + (
     f"Resposta: {NAO_SEI}"
 )
 
-SISTEMA_ENSINAR = BASE + (
-    " Você ensina uma tarefa no Blender UM PASSO POR VEZ. Em cada passo:\n"
-    "1. Explique em até 3 frases o que vai fazer e qual atalho de teclado o aluno usaria "
-    "para fazer o mesmo à mão (por exemplo Shift+A para adicionar, G mover, R girar, S escalar, Tab modo de edição).\n"
-    "2. Chame a ferramenta execute_blender_code com o código Python (bpy) SÓ desse passo e a explicação "
-    "no campo explicacao.\n"
-    "O chão fica em z = 0: objetos que ficam apoiados devem encostar nele.\n"
-    "Se precisar saber o que já existe na cena, use as ferramentas de leitura antes. "
-    "Para devolver dados do código, atribua um dicionário à variável result. "
-    "Depois de cada passo, espere o aluno pedir o próximo. "
-    "Quando a tarefa estiver completa, não chame ferramentas: responda com um resumo curto do que foi feito "
-    "e a lista dos atalhos usados.\n"
-    "O exemplo abaixo só mostra o formato. Para outra tarefa, crie os passos DESSA tarefa.\n"
-    "Exemplo, pedido \"faça um cone de trânsito\":\n"
-    "Passo 1, explicacao: Vou criar a base: uma placa de 0,4 m x 0,4 m com 0,04 m de altura, apoiada no chão. "
-    "À mão: Shift+A, Malha, Cubo; depois S para escalar e G, Z para subir.\n"
-    "Passo 1, code:\n"
-    "import bpy\n"
-    "bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 0.02))\n"
-    "bpy.context.object.name = 'Base'\n"
-    "bpy.context.object.scale = (0.4, 0.4, 0.04)\n"
-    "Passo 2, explicacao: Agora o cone, com 0,6 m de altura, em cima da base. O topo da base está em "
-    "z = 0,04, então o centro do cone fica em 0,04 + 0,3 = 0,34. À mão: Shift+A, Malha, Cone; depois G, Z.\n"
-    "Passo 2, code:\n"
-    "import bpy\n"
-    "bpy.ops.mesh.primitive_cone_add(radius1=0.15, radius2=0.02, depth=0.6, location=(0, 0, 0.34))\n"
-    "bpy.context.object.name = 'Cone'\n"
-    "Resumo final: Pronto! O cone de trânsito tem uma base no chão e um cone apoiado nela. "
-    "Atalhos usados: Shift+A (adicionar), S (escalar), G e Z (mover na altura)."
-)
-
-SISTEMA_DEMONSTRAR = BASE + (
-    " Agora você cria no Blender, sozinho e de uma vez, o objeto que o aluno pediu. "
-    "Chame a ferramenta execute_blender_code UMA vez, com o código Python completo do objeto inteiro.\n"
-    "O código já começa com estas funções prontas. Monte o objeto só com elas, sem bpy.ops, "
+FUNCOES_PRONTAS_TEXTO = (
+    "O código já começa com estas funções prontas. Crie as peças só com elas, sem bpy.ops, "
     "e NÃO escreva def caixa, def cilindro, def cone, def esfera, def limpar_cena nem def ao_lado (elas já existem):\n"
     "- caixa(nome, largura, profundidade, altura, x=0, y=0, base=0, cor='#B8B8B8', chanfro=0.01, giro=0)\n"
     "- cilindro(nome, raio, altura, x=0, y=0, base=0, cor='#B8B8B8', chanfro=0.005, raio_topo=None, eixo='z'): "
@@ -129,6 +96,54 @@ SISTEMA_DEMONSTRAR = BASE + (
     "- with ao_lado(dx, dy=0): as peças criadas dentro do bloco saem deslocadas dx em X e dy em Y.\n"
     "Medidas em metros. largura vai no eixo X, profundidade no Y, altura no Z. x e y são o centro da peça. "
     "base é a altura (z) do ponto mais BAIXO da peça; o chão é z = 0. giro gira a caixa em graus em volta do eixo Z.\n"
+)
+
+MEDIDAS_TIPICAS = (
+    "Medidas típicas (metros): mesa 1,4 x 0,8 com topo a 0,75; cadeira com assento 0,45 x 0,45 a 0,45 do chão "
+    "e encosto até 0,9; banco alto 0,75; cama de solteiro 1,9 x 0,9, colchão de 0,2 sobre estrado a 0,25; "
+    "sofá 2,0 x 0,85, assento a 0,42, encosto até 0,8, braços até 0,6; estante 0,8 x 0,3 x 1,8 com prateleiras "
+    "a cada 0,35; armário 1,0 x 0,55 x 2,0; criado-mudo 0,45 x 0,4 x 0,55; luminária de mesa 0,45 de altura; "
+    "caneca raio 0,04 e altura 0,1; garrafa raio 0,035 e altura 0,3; porta 0,8 x 0,04 x 2,1.\n"
+)
+
+# Antes o Ensinar escrevia bpy puro e o qwen3.5:4b confundia o centro com a base (11/11/2026: tampo a 0,1 m
+# com pernas atravessando o chão) e inventava operadores (transform.move, primitive_animal_add).
+SISTEMA_ENSINAR = BASE + (
+    " Você ensina uma tarefa no Blender UM PASSO POR VEZ. Em cada passo:\n"
+    "1. Explique em até 3 frases o que vai fazer e qual atalho de teclado o aluno usaria "
+    "para fazer o mesmo à mão (por exemplo Shift+A para adicionar, G mover, R girar, S escalar, Tab modo de edição).\n"
+    "2. Chame a ferramenta execute_blender_code com o código Python SÓ desse passo e a explicação "
+    "no campo explicacao. Cada passo cria UMA peça ou um grupo de peças iguais (as 4 pernas); "
+    "nunca o objeto inteiro de uma vez.\n"
+) + FUNCOES_PRONTAS_TEXTO + (
+    "Monte de baixo para cima: uma peça apoiada em outra tem base = base + altura da peça de baixo. "
+    "Nada pode flutuar nem entrar no chão. Faça só as peças principais do objeto pedido (mesa: pernas e tampo), "
+    "sem enfeites que o aluno não pediu; a tarefa costuma ter de 2 a 5 passos.\n"
+    "Para mudar uma peça que já existe, use o nome dela: bpy.data.objects['Tampo'].location.z = 0.71 "
+    "(nas peças das funções prontas, location.z é a base). Não invente funções nem operadores.\n"
+) + MEDIDAS_TIPICAS + (
+    "Se precisar saber o que já existe na cena, use as ferramentas de leitura antes. "
+    "Depois de cada passo, espere o aluno pedir o próximo. "
+    "Quando a tarefa estiver completa, não chame ferramentas: responda com um resumo curto do que foi feito "
+    "e a lista dos atalhos usados.\n"
+    "O exemplo abaixo só mostra o formato. Para outra tarefa, crie os passos DESSA tarefa.\n"
+    "Exemplo, pedido \"faça um cone de trânsito\":\n"
+    "Passo 1, explicacao: Vou criar a base: uma placa de 0,4 m x 0,4 m com 0,04 m de altura, apoiada no chão. "
+    "À mão: Shift+A, Malha, Cubo; depois S para escalar.\n"
+    "Passo 1, code:\n"
+    "caixa('Base', 0.4, 0.4, 0.04, cor='#EDEDE8')\n"
+    "Passo 2, explicacao: Agora o cone, com 0,6 m de altura, apoiado na base. O topo da base está em "
+    "z = 0,04, então a base do cone fica em 0,04. À mão: Shift+A, Malha, Cone; depois G, Z para subir.\n"
+    "Passo 2, code:\n"
+    "cone('Cone', 0.15, 0.6, base=0.04, raio_topo=0.02, cor='#FF6A13')\n"
+    "Resumo final: Pronto! O cone de trânsito tem uma base no chão e um cone apoiado nela. "
+    "Atalhos usados: Shift+A (adicionar), S (escalar), G e Z (mover na altura)."
+)
+
+SISTEMA_DEMONSTRAR = BASE + (
+    " Agora você cria no Blender, sozinho e de uma vez, o objeto que o aluno pediu. "
+    "Chame a ferramenta execute_blender_code UMA vez, com o código Python completo do objeto inteiro.\n"
+) + FUNCOES_PRONTAS_TEXTO + (
     "Método para QUALQUER objeto:\n"
     "1. Pense em como o objeto real é e divida em peças simples (caixas, cilindros, cones, esferas). "
     "Inclua os detalhes que fazem ele ser reconhecido (puxadores, rodapé, braços, alça, tampa).\n"
@@ -140,11 +155,7 @@ SISTEMA_DEMONSTRAR = BASE + (
     "com as mesmas medidas que teriam sozinho; não some o deslocamento à mão.\n"
     "4. Dê nomes claros às peças e cores que combinem (madeira #8B5A2B ou #A0703C, metal #3A3A3A, "
     "tecido #5B6C8F, branco #EDEDE8, cerâmica #D9D4CC).\n"
-    "Medidas típicas (metros): mesa 1,4 x 0,8 com topo a 0,75; cadeira com assento 0,45 x 0,45 a 0,45 do chão "
-    "e encosto até 0,9; banco alto 0,75; cama de solteiro 1,9 x 0,9, colchão de 0,2 sobre estrado a 0,25; "
-    "sofá 2,0 x 0,85, assento a 0,42, encosto até 0,8, braços até 0,6; estante 0,8 x 0,3 x 1,8 com prateleiras "
-    "a cada 0,35; armário 1,0 x 0,55 x 2,0; criado-mudo 0,45 x 0,4 x 0,55; luminária de mesa 0,45 de altura; "
-    "caneca raio 0,04 e altura 0,1; garrafa raio 0,035 e altura 0,3; porta 0,8 x 0,04 x 2,1.\n"
+) + MEDIDAS_TIPICAS + (
     "Os exemplos abaixo só mostram o método. Para outro objeto, crie as peças DESSE objeto.\n"
     "Exemplo 1, mesa (pernas recuadas dos cantos, saia logo abaixo do tampo):\n"
     "madeira = '#8B5A2B'\n"
@@ -191,6 +202,9 @@ SISTEMA_VERIFICAR = BASE + (
 
 PALAVRAS_PROXIMO = {"proximo", "proxima", "continuar", "continue", "segue", "sim", "ok", "pode", "vai"}
 PALAVRAS_PARAR = {"parar", "pare", "chega", "encerrar", "sair"}
+# Resposta à pergunta "apago a cena antes de começar?"; vale a primeira palavra ("sim, pode apagar").
+PALAVRAS_SIM = {"sim", "s", "pode", "apaga", "apague", "apagar", "limpa", "limpar", "ok", "quero"}
+PALAVRAS_NAO = {"nao", "n", "manter", "mantem", "mantenha", "deixa", "deixe"}
 
 
 def normalizar(texto):
@@ -221,6 +235,7 @@ class Estado:
     pendente: dict | None = None     # {"codigo", "interacao"} esperando o clique
     tentativas: int = 0              # erros seguidos no passo atual
     em_ensino: bool = False
+    pedido_guardado: str = ""        # Ensinar: pedido esperando a resposta de "apago a cena?"
     interacao: dict | None = None    # interação em andamento: {"id", "inicio", "resposta", "erros"}
 
 
@@ -249,6 +264,22 @@ class Agente:
         # ponytail: fila única para todos os alunos; serve a um PC por aluno, como no laboratório.
         self._fila = threading.RLock()
         self._ao_escrever = self._ao_avisar = None
+        self._ops = None  # operadores do Blender (bpy.ops), lidos na primeira vez que o validador precisa
+
+    def _operadores(self):
+        """{módulo: [operadores]} do Blender aberto, ou None se não der para ler (aí não confere)."""
+        if self._ops is None:
+            try:
+                self._ops = self.blender.operadores()
+            except Exception:
+                return None
+        return self._ops
+
+    def _malhas_na_cena(self):
+        try:
+            return [m["nome"] for m in self.blender.medir_cena()["malhas"]]
+        except Exception:
+            return []
 
     def _etapa(self, texto):
         if self._ao_avisar:
@@ -311,6 +342,7 @@ class Agente:
         estado.pendente = None
         estado.tentativas = 0
         estado.em_ensino = False
+        estado.pedido_guardado = ""
 
     # --- RF4: Explicar ---
 
@@ -590,6 +622,13 @@ class Agente:
             self._anotar(estado, texto)
             return Resposta(texto)
 
+        if estado.pedido_guardado:
+            pedido, estado.pedido_guardado = estado.pedido_guardado, ""
+            palavra = comando.split()[0].strip(",;:") if comando else ""
+            if palavra in PALAVRAS_SIM or palavra in PALAVRAS_NAO:
+                return self._comecar_ensino(estado, pedido, apagar=palavra in PALAVRAS_SIM)
+            # Escreveu outra coisa: vale como um pedido novo.
+
         if not estado.em_ensino and self.conhecimento is not None and self._e_duvida(estado, mensagem):
             # Dúvida no Ensinar virava um passo sem sentido; responde com o manual e mostra o modo certo.
             resposta = self._explicar(estado, mensagem)
@@ -605,15 +644,47 @@ class Agente:
             return Resposta(texto, problema=BLENDER_FECHADO)
 
         if not estado.em_ensino:
-            estado.mensagens = [{"role": "system", "content": SISTEMA_ENSINAR},
-                                {"role": "user", "content": mensagem}]
-            estado.em_ensino = True
-        elif comando in PALAVRAS_PROXIMO:
-            estado.mensagens.append({"role": "user", "content": "Pode fazer o próximo passo."})
+            nomes = self._malhas_na_cena()
+            if not nomes:
+                return self._comecar_ensino(estado, mensagem, apagar=False)
+            # O cubo que o Blender cria ao abrir ficava no meio da mesa da aula.
+            estado.pedido_guardado = mensagem
+            lista = ", ".join(nomes[:6]) + (", …" if len(nomes) > 6 else "")
+            texto = (f"A cena do Blender já tem {len(nomes)} objeto(s): {lista}. "
+                     "Quer que eu apague antes de começar? Responda **sim** para apagar ou **não** para manter.")
+            self._anotar(estado, texto)
+            return Resposta(texto)
+        if comando in PALAVRAS_PROXIMO:
+            # O qwen3.5:4b não parava sozinho: depois da mesa pronta, inventava "rodapés" e "detalhes".
+            estado.mensagens.append({"role": "user", "content": (
+                "Pode fazer o próximo passo. Se o objeto já tem todas as peças principais, "
+                "não chame ferramentas: responda só o resumo final.")})
         else:
             estado.mensagens.append({"role": "user", "content": mensagem})
         estado.tentativas = 0
         return self._proximo_passo(estado)
+
+    def _comecar_ensino(self, estado, pedido, apagar):
+        aviso = ""
+        if apagar:
+            try:
+                self.blender.remover_malhas_exceto(set())
+                aviso = "*Apaguei os objetos da cena (a luz e a câmera ficaram).*\n\n"
+            except Exception as erro:
+                texto = f"Não consegui apagar a cena: {erro}"
+                self._anotar(estado, texto)
+                return Resposta(texto)
+        else:
+            nomes = self._malhas_na_cena()
+            if nomes:
+                pedido += f"\n(A cena já tem {', '.join(nomes)}. Não mexa neles.)"
+        estado.mensagens = [{"role": "system", "content": SISTEMA_ENSINAR},
+                            {"role": "user", "content": pedido}]
+        estado.em_ensino = True
+        estado.tentativas = 0
+        resposta = self._proximo_passo(estado, prefixo=aviso)
+        resposta.atualizar_cena = resposta.atualizar_cena or apagar
+        return resposta
 
     def _proximo_passo(self, estado, prefixo=""):
         """Roda a LLM até ela propor código (para e espera o clique) ou encerrar a tarefa."""
@@ -642,6 +713,16 @@ class Agente:
                 else:
                     self._responder_ferramenta_leitura(estado, chamada)
             if codigo is not None:
+                codigo = sem_redefinicoes(codigo)
+                invalido = validar(codigo, self._operadores())
+                if invalido:
+                    # Barrado antes do aluno ver: código que o Blender recusaria não vira cartão de Executar.
+                    self.banco.registrar_codigo(estado.interacao["id"], codigo, "recusado", "\n".join(invalido), True)
+                    estado.interacao["erros"] += 1
+                    estado.mensagens.append({"role": "tool", "tool_name": FERRAMENTA_EXECUTAR, "content": (
+                        "Não executado, o código tem erros:\n- " + "\n- ".join(invalido)
+                        + "\nMande o código deste mesmo passo corrigido.")})
+                    continue
                 estado.pendente = {"codigo": codigo, "interacao": estado.interacao["id"]}
                 explicacao = (explicacao or (mensagem.tool_calls and codigo_no_texto(mensagem.content or "")[1])
                               or "Vou executar este passo no Blender.")
@@ -661,7 +742,7 @@ class Agente:
         if not pendente:
             return Resposta("Não há código esperando confirmação.")
         try:
-            saida, erro = self.blender.executar(pendente["codigo"])
+            saida, erro = self.blender.executar_com_ajudantes(pendente["codigo"])
         except Exception as falha:
             saida, erro = str(falha), True
         self.banco.registrar_codigo(pendente["interacao"], pendente["codigo"], "executado", saida[:4000], erro)
@@ -687,12 +768,19 @@ class Agente:
         # O agente confere a cena em vez de confiar na própria resposta (RF5).
         try:
             cena = self.blender.medir_cena()
-            conferencia = f"\nCena depois do passo: {json.dumps(cena, ensure_ascii=False)[:2500]}"
         except Exception:
-            conferencia = ""
+            cena = None
+        conferencia, texto, problemas = "", "Passo executado. Veja a cena ao lado.", []
+        if cena:
+            conferencia = f"\nCena depois do passo: {json.dumps(cena, ensure_ascii=False)[:2500]}"
+            problemas = problemas_da_cena(cena)[:8] if cena["malhas"] else []
+        if problemas:
+            lista = "\n- ".join(problemas)
+            conferencia += f"\nPROBLEMAS na cena:\n- {lista}\nNo próximo passo, corrija isso antes de continuar."
+            texto += f"\n\n**Atenção**, a conferência da cena achou:\n- {lista}\n\nNo próximo passo eu corrijo isso."
         estado.mensagens.append({"role": "tool", "tool_name": FERRAMENTA_EXECUTAR,
                                  "content": f"Executado com sucesso: {saida[:1500]}{conferencia}"})
-        texto = "Passo executado. Veja a cena ao lado. Escreva **próximo** para continuar ou **parar** para encerrar."
+        texto += " Escreva **próximo** para continuar ou **parar** para encerrar."
         self._anotar(estado, "[executado]")
         return Resposta(texto, atualizar_cena=True)
 
@@ -768,15 +856,21 @@ def _assinaturas():
 ASSINATURAS = _assinaturas()
 
 
-def validar(codigo):
-    """Confere o código do Demonstrar antes de ir ao Blender: sintaxe e chamadas às funções prontas
-    (parâmetro que não existe, faltando ou sobrando). Devolve a lista de problemas; vazia = pode executar."""
+def validar(codigo, operadores=None):
+    """Confere o código antes de ir ao Blender: sintaxe, chamadas às funções prontas (parâmetro que não
+    existe, faltando ou sobrando) e, se vier `operadores` ({módulo: nomes}), bpy.ops inventados.
+    Devolve a lista de problemas; vazia = pode executar."""
     try:
         arvore = ast.parse(codigo)
     except SyntaxError as erro:
         return [f"Erro de sintaxe na linha {erro.lineno}: {erro.msg}."]
     problemas = []
     for n in ast.walk(arvore):
+        if operadores is not None and isinstance(n, ast.Call):
+            op = re.fullmatch(r"bpy\.ops\.(\w+)\.(\w+)", ast.unparse(n.func))
+            if op and op[2] not in operadores.get(op[1], ()):
+                problemas.append(f"Linha {n.lineno}: bpy.ops.{op[1]}.{op[2]} não existe no Blender 5.1. "
+                                 "Use as funções prontas ou mude a peça pelo nome (bpy.data.objects[...]).")
         if not (isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id in ASSINATURAS):
             continue
         if any(isinstance(a, ast.Starred) for a in n.args) or any(k.arg is None for k in n.keywords):
@@ -799,25 +893,32 @@ def validar(codigo):
 def problemas_da_cena(cena, tol=0.02):
     """Peças abaixo do chão ou flutuando, pela medição de `Blender.medir_cena()`.
 
-    Uma peça está apoiada se a base encosta no chão, no topo de outra peça ou fica dentro
-    da altura de outra (encaixe, como a perna que entra no tampo), e as duas se cruzam em X e Y.
+    Uma peça está apoiada se a base encosta no chão, ou no topo ou dentro da altura (encaixe, como a
+    perna que entra no tampo) de outra peça apoiada, e as duas se cruzam em X e Y. O apoio tem de
+    chegar ao chão: tampo e pernas a 0,75 m, um sustentando o outro, flutuam juntos (visto em 11/11/2026).
     ponytail: compara caixas alinhadas aos eixos; uma peça girada ocupa uma caixa maior que ela.
     """
     malhas = cena["malhas"]
     if not malhas:
         return ["A cena ficou vazia: nenhuma peça foi criada. Não chame limpar_cena() no fim do código."]
+    # A peça abaixo do chão já tem o seu aviso; ela serve de apoio para não gerar um segundo aviso nas de cima.
+    apoiadas = [m for m in malhas if m["z_min"] <= tol]
+    soltas = [m for m in malhas if m["z_min"] > tol]
+    mudou = True
+    while mudou:
+        mudou = False
+        for m in list(soltas):
+            if any(o["z_min"] - tol <= m["z_min"] <= o["z_max"] + tol and se_cruzam(m, o, tol) for o in apoiadas):
+                apoiadas.append(m)
+                soltas.remove(m)
+                mudou = True
     problemas = []
     for m in malhas:
         if m["z_min"] < -tol:
             problemas.append(f"'{m['nome']}' está abaixo do chão: a base está em z = {m['z_min']}.")
-            continue
-        outras = [o for o in malhas if o is not m]
-        apoiada = (abs(m["z_min"]) <= tol
-                   or any(o["z_min"] - tol <= m["z_min"] <= o["z_max"] + tol and se_cruzam(m, o, tol)
-                          for o in outras))
-        if not apoiada:
+        elif m in soltas:
             problemas.append(f"'{m['nome']}' está flutuando: a base está em z = {m['z_min']} "
-                             "e não encosta no chão nem em outra peça.")
+                             "e não encosta no chão nem em outra peça apoiada.")
     return problemas
 
 
@@ -837,16 +938,24 @@ def codigo_no_texto(texto):
     if achado:
         return achado.group(1).strip(), (texto[:achado.start()] + texto[achado.end():]).strip()
     # O qwen3.5:4b às vezes escreve o código solto, sem ``` ("Passo 1, code:\nimport bpy..."): pega de
-    # "import bpy" em diante e tira as linhas do fim até compilar (texto que veio depois do código).
-    solto = re.search(r"^import bpy\b.*", texto, re.S | re.M)
+    # "import bpy" (ou o que vem depois de "code:", copiado do exemplo do Ensinar) em diante e tira as
+    # linhas do fim até compilar (texto que veio depois do código).
+    solto = (re.search(r"^import bpy\b.*", texto, re.S | re.M)
+             or re.search(r"(?<=code:)[ \t]*\r?\n.*", texto, re.S | re.I))
     if solto:
-        linhas = solto.group(0).splitlines()
+        linhas = solto.group(0).strip().splitlines()
         while linhas:
+            codigo = "\n".join(linhas).strip()
             try:
-                ast.parse("\n".join(linhas))
-                return "\n".join(linhas).strip(), texto[:solto.start()].strip()
+                arvore = ast.parse(codigo)
             except SyntaxError:
                 linhas.pop()
+                continue
+            if any(isinstance(n, ast.Call) for n in ast.walk(arvore)):  # frase solta que compila não é código
+                antes = texto[:solto.start()].strip()
+                antes = re.sub(r"(?:Passo \d+,\s*)?code:\s*$", "", antes, flags=re.I)
+                return codigo, re.sub(r"Passo \d+,\s*explicacao:\s*", "", antes, flags=re.I).strip()
+            break
     return None, texto.strip()
 
 
