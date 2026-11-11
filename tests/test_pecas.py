@@ -105,3 +105,23 @@ def test_mais_parecidas_poe_a_mais_parecida_por_ultimo():
 
     vetores = [[1, 0], [0, 1], [0.9, 0.1], [-1, 0]]
     assert mais_parecidas([1, 0], vetores, 2) == [2, 0]
+
+
+def test_peca_principal_no_ar_desce_para_o_chao():
+    ficha = {"objeto": "prédio", "pecas": [
+        peca("Corpo", "caixa", 10, 10, 30, altura_do_chao=0.5),
+        peca("Janelas", "caixa", 1.5, 0.1, 1.5, "ao_lado_frente", "Corpo", altura_do_chao=4, repetir_x=4)]}
+    codigo, _ = montar(json.dumps(ficha))
+    assert "caixa('Corpo', 10, 10, 30, cor=" in codigo and "base=4," in codigo  # as janelas descem junto
+    robo = {"objeto": "robô", "pecas": [peca("Perna", "caixa", 0.1, 0.1, 0.5),
+                                        peca("Tronco", "caixa", 0.5, 0.3, 0.6, altura_do_chao=0.5)]}
+    assert "base=0.5" in montar(json.dumps(robo))[0]  # apoiado nas pernas: não desce
+
+
+def test_janelas_cabem_na_parede_e_nao_se_afastam_dela():
+    pecas = colocar(peca("Corpo", "caixa", 10, 10, 30),
+                    peca("Janelas", "caixa", 1.5, 0.1, 1.5, "ao_lado_frente", "Corpo", repetir_x=6, espaco=1),
+                    peca("Lateral", "caixa", 0.1, 1.8, 1.5, "ao_lado_esquerda", "Corpo", mover_x=-3.2))
+    janelas = [c for n, c in pecas.items() if n.startswith("Janelas")]
+    assert len(janelas) == 4 and all(abs(j.x) + 0.75 <= 5 for j in janelas)
+    assert pecas["Lateral"].x == pytest.approx(-5.05)

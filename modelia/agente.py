@@ -1001,6 +1001,19 @@ def problemas_da_cena(cena, tol=0.02):
     malhas = cena["malhas"]
     if not malhas:
         return ["A cena ficou vazia: nenhuma peça foi criada. Não chame limpar_cena() no fim do código."]
+    soltas = pecas_soltas(malhas, tol)
+    problemas = []
+    for m in malhas:
+        if m["z_min"] < -tol:
+            problemas.append(f"'{m['nome']}' está abaixo do chão: a base está em z = {m['z_min']}.")
+        elif m in soltas:
+            problemas.append(f"'{m['nome']}' está flutuando: a base está em z = {m['z_min']} "
+                             "e não encosta no chão nem em outra peça apoiada.")
+    return problemas
+
+
+def pecas_soltas(malhas, tol=0.02):
+    """As malhas cujo apoio não chega ao chão (veja problemas_da_cena)."""
     # A peça abaixo do chão já tem o seu aviso; ela serve de apoio para não gerar um segundo aviso nas de cima.
     apoiadas = [m for m in malhas if m["z_min"] <= tol]
     soltas = [m for m in malhas if m["z_min"] > tol]
@@ -1012,14 +1025,7 @@ def problemas_da_cena(cena, tol=0.02):
                 apoiadas.append(m)
                 soltas.remove(m)
                 mudou = True
-    problemas = []
-    for m in malhas:
-        if m["z_min"] < -tol:
-            problemas.append(f"'{m['nome']}' está abaixo do chão: a base está em z = {m['z_min']}.")
-        elif m in soltas:
-            problemas.append(f"'{m['nome']}' está flutuando: a base está em z = {m['z_min']} "
-                             "e não encosta no chão nem em outra peça apoiada.")
-    return problemas
+    return soltas
 
 
 def se_cruzam(a, b, tol):

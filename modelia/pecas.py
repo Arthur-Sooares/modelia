@@ -213,6 +213,13 @@ def _tamanho(p, eixo):
     return p["largura"], p["profundidade"], p["altura"]
 
 
+def _caber(n, tamanho, espaco, limite):
+    """Quantas cópias (no máximo n) cabem em fila dentro de `limite`. Pelo menos 1."""
+    while n > 1 and n * tamanho + (n - 1) * espaco > limite:
+        n -= 1
+    return n
+
+
 def _colocar(p, ref):
     """Cópias da peça p, posta em relação à caixa `ref` da peça 'de' (None = sem referência)."""
     posicao, giro = p["posicao"], 0
@@ -222,6 +229,20 @@ def _colocar(p, ref):
     largura, prof, altura = _tamanho(p, eixo)
     nx, ny, nz = p["repetir"]
     espaco = p["espaco"]
+    mx, my, mz = p["mover"]
+    if ref is not None and posicao.startswith("ao_lado") and p["forma"] != "alca":
+        # O qwen põe 6 janelas de 1,5 m numa parede de 10 m e as das pontas saem do prédio; e usa
+        # mover_x para longe da parede, e a janela fica solta no ar (11/11/2026). A grade passa a caber
+        # na face, e a peça pode entrar na parede, mas não se afastar dela.
+        x0, x1, y0, y1, z0, z1 = ref
+        livre = z1 - z0 - (p["altura_do_chao"] or 0)
+        if posicao in ("ao_lado_frente", "ao_lado_tras"):
+            nx = _caber(nx, largura, espaco, x1 - x0)
+            my = max(my, 0) if posicao == "ao_lado_frente" else min(my, 0)
+        else:
+            ny = _caber(ny, prof, espaco, y1 - y0)
+            mx = max(mx, 0) if posicao == "ao_lado_esquerda" else min(mx, 0)
+        nz = _caber(nz, altura, espaco, livre)
     # a grade de cópias é posta como um bloco só: as contas abaixo usam o tamanho do bloco
     gl, gp, ga = (n * t + (n - 1) * espaco for n, t in ((nx, largura), (ny, prof), (nz, altura)))
     chao = p["altura_do_chao"]
@@ -272,7 +293,6 @@ def _colocar(p, ref):
             lugares = [(cx, cy, base)]
         if chao is not None and posicao.startswith(("em_cima", "dentro", "no_meio")):
             lugares = [(x, y, z0 + chao) for x, y, _ in lugares]
-    mx, my, mz = p["mover"]
     lugares = [(x + mx, y + my, base + mz) for x, y, base in lugares]
     copias = []
     for x, y, base in lugares:
@@ -311,6 +331,34 @@ def resolver(pecas):
     return [c for p in pecas for c in feitas[p["nome"]]]
 
 
+def resolver_no_chao(pecas):
+    """resolver(), mas a peça solta no ar que só tinha altura_do_chao ('centro' do chão) desce para o chão.
+
+    O qwen3.5:4b põe altura_do_chao na peça principal (o Corpo do prédio a 0,5 m) e o objeto inteiro
+    flutua; 1 em cada 4 fichas, medido em 11/11/2026. Quem está apoiado (o tronco do robô nas pernas,
+    a carroceria nas rodas) não muda. As peças presas a ela descem junto, porque a posição é relativa.
+    """
+    from modelia.agente import pecas_soltas  # aqui dentro: agente importa este módulo
+
+    por_nome = {p["nome"]: p for p in pecas}
+
+    def peca_de(nome):  # as cópias ganham um número no fim: Janelas12 vem de Janelas
+        while nome not in por_nome and nome[-1:].isdigit():
+            nome = nome[:-1]
+        return por_nome.get(nome, {"posicao": ""})
+
+    for _ in range(len(pecas)):
+        colocadas = resolver(pecas)
+        malhas = [{"nome": c.nome, "xy": c.caixa()[:4], "z_min": c.caixa()[4], "z_max": c.caixa()[5],
+                   "peca": peca_de(c.nome)} for c in colocadas]
+        descer = [m["peca"] for m in pecas_soltas(malhas)
+                  if m["peca"]["posicao"] == "centro" and m["peca"]["altura_do_chao"]]
+        if not descer:
+            return colocadas
+        descer[0]["altura_do_chao"] = None  # uma por vez: descer a de baixo pode apoiar as outras
+    return colocadas
+
+
 # --- código ---
 
 def _n(valor):
@@ -346,7 +394,7 @@ def montar(texto):
     """JSON da LLM -> (código, frase do que foi criado). ValueError se a ficha não servir."""
     dados = json.loads(texto)
     objeto, pecas = _limpar(dados)
-    colocadas = resolver(pecas)
+    colocadas = resolver_no_chao(pecas)
     descricao = " ".join(str(dados.get("descricao", "")).split())  # numa linha só: vira comentário
     codigo = (f"# {objeto}: {descricao}\n"
               "# (ficha de peças preenchida pela LLM; posições calculadas pelo Modelia)\n"
