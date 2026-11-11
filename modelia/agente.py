@@ -140,6 +140,14 @@ SISTEMA_ENSINAR = BASE + (
     "Atalhos usados: Shift+A (adicionar), S (escalar), G e Z (mover na altura)."
 )
 
+SISTEMA_PASSO = BASE + (
+    " Você está dando uma aula de Blender passo a passo. Você recebe o pedido do aluno, os passos da aula e as "
+    "peças do passo atual, já calculadas e certas. Explique em até 3 frases, para um iniciante, o que este "
+    "passo cria, para que serve no objeto e as medidas da lista (sem inventar outras), e como fazer o mesmo à mão no "
+    "Blender: Shift+A, Malha e a forma da lista, depois S para escalar e G para mover. "
+    "Não invente medidas, materiais nem posições. Não escreva código. Responda só a explicação."
+)
+
 SISTEMA_DEMONSTRAR = BASE + (
     " Agora você cria no Blender, sozinho e de uma vez, o objeto que o aluno pediu. "
     "Chame a ferramenta execute_blender_code UMA vez, com o código Python completo do objeto inteiro.\n"
@@ -236,6 +244,7 @@ class Estado:
     tentativas: int = 0              # erros seguidos no passo atual
     em_ensino: bool = False
     pedido_guardado: str = ""        # Ensinar: pedido esperando a resposta de "apago a cena?"
+    plano: dict | None = None        # Ensinar guiado: {"pedido", "passos", "frase", "atual"}
     interacao: dict | None = None    # interação em andamento: {"id", "inicio", "resposta", "erros"}
 
 
@@ -343,6 +352,7 @@ class Agente:
         estado.tentativas = 0
         estado.em_ensino = False
         estado.pedido_guardado = ""
+        estado.plano = None
 
     # --- RF4: Explicar ---
 
@@ -618,6 +628,7 @@ class Agente:
         if estado.em_ensino and comando in PALAVRAS_PARAR:
             estado.em_ensino = False
             estado.mensagens = []
+            estado.plano = None
             texto = "Tarefa encerrada. A cena ficou como estava."
             self._anotar(estado, texto)
             return Resposta(texto)
@@ -628,6 +639,18 @@ class Agente:
             if palavra in PALAVRAS_SIM or palavra in PALAVRAS_NAO:
                 return self._comecar_ensino(estado, pedido, apagar=palavra in PALAVRAS_SIM)
             # Escreveu outra coisa: vale como um pedido novo.
+
+        if estado.plano:
+            if comando in PALAVRAS_PROXIMO:
+                return self._passo_do_plano(estado)
+            # No meio da aula guiada, outra mensagem é uma dúvida; o passo atual continua esperando.
+            if self.conhecimento is not None:
+                resposta = self._explicar(estado, mensagem)
+            else:
+                resposta = Resposta("Na aula guiada eu sigo o plano do objeto.")
+                self._anotar(estado, resposta.texto)
+            resposta.texto += "\n\n*Escreva **próximo** para continuar a aula ou **parar** para encerrar.*"
+            return resposta
 
         if not estado.em_ensino and self.conhecimento is not None and self._e_duvida(estado, mensagem):
             # Dúvida no Ensinar virava um passo sem sentido; responde com o manual e mostra o modo certo.
@@ -674,17 +697,60 @@ class Agente:
                 texto = f"Não consegui apagar a cena: {erro}"
                 self._anotar(estado, texto)
                 return Resposta(texto)
-        else:
+        estado.em_ensino = True
+        estado.tentativas = 0
+        estado.plano = self._planejar(estado, pedido)
+        if estado.plano:
+            partes = ", ".join(p["parte"] for p in estado.plano["passos"])
+            aviso += f"Vou te ensinar em {len(estado.plano['passos'])} passos: {partes}.\n\n"
+            resposta = self._passo_do_plano(estado, prefixo=aviso)
+            resposta.atualizar_cena = apagar
+            return resposta
+        # Sem plano (a ficha não serviu): a LLM inventa cada passo, como antes.
+        if not apagar:
             nomes = self._malhas_na_cena()
             if nomes:
                 pedido += f"\n(A cena já tem {', '.join(nomes)}. Não mexa neles.)"
         estado.mensagens = [{"role": "system", "content": SISTEMA_ENSINAR},
                             {"role": "user", "content": pedido}]
-        estado.em_ensino = True
-        estado.tentativas = 0
         resposta = self._proximo_passo(estado, prefixo=aviso)
         resposta.atualizar_cena = resposta.atualizar_cena or apagar
         return resposta
+
+    def _planejar(self, estado, pedido):
+        """O mesmo plano do Demonstrar (receita ou ficha de peças, posições calculadas pelo Modelia),
+        dividido em passos. Antes a LLM inventava cada passo e errava as posições (11/11/2026: as 4 rodas
+        do carro no mesmo lugar e em pé). None se a ficha não servir."""
+        self._etapa("Planejando as peças…")
+        try:
+            objetos = receitas.identificar(pedido)
+            if objetos:
+                codigo, frase = self._fichas_das_receitas(estado, pedido, objetos)
+            else:
+                codigo, frase = self._ficha_de_pecas(estado, pedido)[0]()
+            passos = passos_do_codigo(codigo)
+        except (ValueError, KeyError, TypeError, SyntaxError):
+            return None
+        return {"pedido": pedido, "passos": passos, "frase": frase, "atual": 0} if passos else None
+
+    def _passo_do_plano(self, estado, prefixo=""):
+        """Mostra o passo atual do plano: o código já está pronto; a LLM só explica."""
+        plano = estado.plano
+        passos, i = plano["passos"], plano["atual"]
+        passo = passos[i]
+        self._etapa("Preparando a explicação…")
+        lista = "\n".join(f"{n}. {p['parte']}" for n, p in enumerate(passos, 1))
+        mensagens = [{"role": "system", "content": SISTEMA_PASSO}, {"role": "user", "content": (
+            f"Pedido do aluno: {plano['pedido']}\nPassos da aula:\n{lista}\n\n"
+            f"Passo atual: {i + 1}. {passo['parte']}\nPeças deste passo:\n{descrever_passo(passo['codigo'])}")}]
+        extra = {"ao_escrever": self._ao_escrever} if self._ao_escrever else {}
+        explicacao = (self.conversar(estado.modelo, mensagens, None, **extra).message.content or "").strip()
+        explicacao = codigo_no_texto(explicacao)[1] or f"Agora vou criar: {passo['parte']}."
+        estado.pendente = {"codigo": passo["codigo"], "interacao": estado.interacao["id"]}
+        texto = f"{prefixo}**Passo {i + 1} de {len(passos)}: {passo['parte']}.** {explicacao}"
+        self._anotar(estado, texto)
+        return Resposta(texto + "\n\nConfira o código abaixo e clique em **Executar** ou **Cancelar**.",
+                        codigo=passo["codigo"])
 
     def _proximo_passo(self, estado, prefixo=""):
         """Roda a LLM até ela propor código (para e espera o clique) ou encerrar a tarefa."""
@@ -747,6 +813,8 @@ class Agente:
             saida, erro = str(falha), True
         self.banco.registrar_codigo(pendente["interacao"], pendente["codigo"], "executado", saida[:4000], erro)
 
+        if estado.plano:
+            return self._depois_do_passo_do_plano(estado, saida, erro)
         if erro:
             estado.tentativas += 1
             if estado.interacao:
@@ -784,12 +852,44 @@ class Agente:
         self._anotar(estado, "[executado]")
         return Resposta(texto, atualizar_cena=True)
 
+    def _depois_do_passo_do_plano(self, estado, saida, erro):
+        plano = estado.plano
+        if erro:  # o código do plano é do Modelia: erro aqui é defeito nosso, não da LLM
+            if estado.interacao:
+                estado.interacao["erros"] += 1
+            estado.plano, estado.em_ensino = None, False
+            texto = (f"O Blender recusou este passo:\n```\n{mensagem_de_erro(saida)}\n```\n"
+                     "Parei a aula. Peça de novo ou use **Faz pra mim**.")
+            self._anotar(estado, texto)
+            return Resposta(texto, atualizar_cena=True)
+        plano["atual"] += 1
+        try:
+            problemas = problemas_da_cena(self.blender.medir_cena())[:8]
+        except Exception:
+            problemas = []
+        texto = "Passo executado. Veja a cena ao lado."
+        if problemas:
+            texto += "\n\n**Atenção**, a conferência da cena achou:\n- " + "\n- ".join(problemas) + "\n\n"
+        if plano["atual"] < len(plano["passos"]):
+            texto = texto.rstrip() + " Escreva **próximo** para continuar ou **parar** para encerrar."
+            self._anotar(estado, "[executado]")
+            return Resposta(texto, atualizar_cena=True)
+        estado.plano, estado.em_ensino = None, False
+        self._enquadrar()
+        texto = (f"{plano['frase']}\n\nAtalhos usados: Shift+A (adicionar uma forma), S (escalar), G (mover) "
+                 "e R (girar).\n\n*Tarefa concluída. Faça um novo pedido quando quiser.*")
+        self._anotar(estado, texto)
+        return Resposta(texto, atualizar_cena=True)
+
     @na_fila
     def cancelar(self, estado):
         """Clique em "Cancelar" (RF6): nada é executado e a LLM fica sabendo."""
         if not estado.pendente:
             return Resposta("Não há código esperando confirmação.")
         self._cancelar_pendente(estado, "O aluno cancelou. O código NÃO foi executado e a cena não mudou.")
+        if estado.plano:
+            return Resposta("Cancelado: nada foi executado. Escreva **próximo** para ver este passo de novo "
+                            "ou **parar** para encerrar.")
         return Resposta("Cancelado: nada foi executado. Escreva **próximo** para a LLM propor outro "
                         "caminho, dê uma instrução diferente ou escreva **parar**.")
 
@@ -927,6 +1027,74 @@ def se_cruzam(a, b, tol):
     ax0, ax1, ay0, ay1 = a["xy"]
     bx0, bx1, by0, by1 = b["xy"]
     return ax0 <= bx1 + tol and bx0 <= ax1 + tol and ay0 <= by1 + tol and by0 <= ay1 + tol
+
+
+# O que muda entre peças iguais: RodaEsquerdaFrente, RodaDireitaTras, Perna1... viram uma parte só.
+LADOS_E_NUMEROS = re.compile(r"Esquerd[ao]|Direit[ao]|Frente|Tras|Traseir[ao]|Dianteir[ao]|Superior|Inferior|_?\d+")
+
+
+def passos_do_codigo(codigo):
+    """Divide o código do plano (uma chamada caixa(), cilindro()... por linha) em passos para o Ensinar.
+
+    Um passo por parte (as 4 rodas juntas), na ordem da peça mais baixa para a mais alta, para nada ficar
+    flutuando no meio da aula (a receita da mesa começa pelo tampo). Linhas como `cor = '#8B5A2B'` vão junto
+    com as peças que vêm depois delas. Devolve [{"parte", "codigo"}].
+    """
+    partes, variaveis = {}, []
+    for no in ast.parse(codigo).body:
+        if isinstance(no, ast.Assign):
+            variaveis = [v for v in variaveis if ast.unparse(v.targets[0]) != ast.unparse(no.targets[0])] + [no]
+            continue
+        chamada = no.value if isinstance(no, ast.Expr) else None
+        if not (isinstance(chamada, ast.Call) and chamada.args and isinstance(chamada.args[0], ast.Constant)):
+            continue
+        nome = str(chamada.args[0].value)
+        parte = LADOS_E_NUMEROS.sub("", nome).strip("_") or nome
+        base = next((k.value.value for k in chamada.keywords
+                     if k.arg == "base" and isinstance(k.value, ast.Constant)), 0)
+        passo = partes.setdefault(parte, {"parte": parte, "base": base, "linhas": []})
+        passo["base"] = min(passo["base"], base)
+        passo["linhas"] += [ast.unparse(v) for v in variaveis if ast.unparse(v) not in passo["linhas"]]
+        passo["linhas"].append(ast.unparse(no))
+    ordem = sorted(partes.values(), key=lambda p: p["base"])  # sorted é estável: empate fica na ordem da ficha
+    return [{"parte": p["parte"].replace("_", " "), "codigo": "\n".join(p["linhas"])} for p in ordem]
+
+
+FORMA_NO_BLENDER = {"caixa": "Cubo", "cilindro": "Cilindro", "cilindro_oco": "Cilindro oco (copo)", "cone": "Cone",
+                    "esfera": "Esfera UV", "alca": "Toro cortado ao meio (alça)", "piramide": "Pirâmide",
+                    "telhado": "Telhado de duas águas"}
+
+
+def _m(valor):
+    return f"{valor:.2f}".replace(".", ",") + " m"
+
+
+def descrever_passo(codigo):
+    """O código do passo em palavras, para a LLM explicar sem ler Python (lendo o código, o qwen3.5:4b
+    inventava medidas: "4,5 metros", "17 cm abaixo do chão")."""
+    linhas = {}
+    for n in ast.walk(ast.parse(codigo)):
+        if not (isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id in FORMA_NO_BLENDER):
+            continue
+        nomes = ASSINATURAS.get(n.func.id, ([],))[0]
+        a = {k: v.value for k, v in zip(nomes, n.args, strict=False) if isinstance(v, ast.Constant)}
+        a |= {k.arg: k.value.value for k in n.keywords if isinstance(k.value, ast.Constant)}
+        forma = n.func.id
+        if forma in ("caixa", "piramide", "telhado"):
+            medidas = f"{_m(a.get('largura', 0))} x {_m(a.get('profundidade', 0))}, altura {_m(a.get('altura', 0))}"
+        elif forma == "esfera":
+            medidas = f"diâmetro {_m(2 * a.get('raio', 0))}"
+        elif forma == "alca":
+            medidas = f"raio {_m(a.get('raio', 0))}"
+        else:
+            medidas = f"diâmetro {_m(2 * a.get('raio', 0))}, altura {_m(a.get('altura', 0))}"
+            if a.get("eixo", "z") != "z":
+                medidas = medidas.replace("altura", "deitado, comprimento")
+        base = a.get("base", 0)
+        lugar = "apoiado no chão" if not base else f"começando a {_m(base)} do chão"
+        texto = f"{FORMA_NO_BLENDER[forma]} de {medidas}, {lugar}"
+        linhas[texto] = linhas.get(texto, 0) + 1
+    return "\n".join(f"- {q} x {t}" if q > 1 else f"- {t}" for t, q in linhas.items())
 
 
 BLOCO_PYTHON = re.compile(r"```(?:python|py)[ \t]*\r?\n(.*?)```", re.DOTALL | re.IGNORECASE)

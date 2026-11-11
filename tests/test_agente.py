@@ -642,3 +642,58 @@ def test_codigo_depois_de_code_tambem_vale():
     assert codigo == "caixa('Perna', 0.06, 0.06, 0.7)"
     assert resto == "Vamos fazer as pernas.\nCrio as pernas. À mão: Shift+A."
     assert agente.codigo_no_texto("O code: abaixo\nsó texto")[0] is None
+
+
+# --- Ensinar guiado pelo plano do Demonstrar (11/11/2026) ---
+
+FICHA_MESA = json.dumps({"largura": 1.2, "profundidade": 0.8, "altura": 0.75, "pernas": "quadradas",
+                         "cor": "madeira"})
+
+
+def test_passos_do_codigo_junta_pecas_iguais_de_baixo_para_cima():
+    codigo = ("# mesa\ncor = '#8B5A2B'\ncaixa('Tampo', 1.2, 0.8, 0.04, base=0.71, cor=cor)\n"
+              "caixa('Perna1', 0.05, 0.05, 0.71, x=-0.5, cor=cor)\ncaixa('Perna2', 0.05, 0.05, 0.71, x=0.5, cor=cor)\n"
+              "cilindro('RodaEsquerdaFrente', 0.3, 0.2, base=0, eixo='x')\ncilindro('RodaDireitaTras', 0.3, 0.2)")
+    passos = agente.passos_do_codigo(codigo)
+    assert [p["parte"] for p in passos] == ["Perna", "Roda", "Tampo"]
+    assert passos[0]["codigo"].startswith("cor = '#8B5A2B'\ncaixa('Perna1'") and passos[0]["codigo"].count("caixa") == 2
+    assert passos[2]["codigo"].startswith("cor = ")  # cada passo leva as variáveis que usa
+
+
+def test_ensinar_segue_o_plano_e_a_llm_so_explica(banco):
+    blender = BlenderFalso()
+    explicacoes = [mensagem(f"Explicação {n}. À mão: Shift+A.") for n in range(1, 4)]
+    llm = LLMFalsa(*explicacoes, ficha=FICHA_MESA)
+    ag = Agente(blender, None, banco, conversar=llm)
+    estado = novo_estado(banco, ENSINAR)
+
+    resposta = ag.responder(estado, "me ensina a fazer uma mesa")
+    assert "3 passos: Perna, Saia, Tampo" in resposta.texto and "Passo 1 de 3: Perna" in resposta.texto
+    assert resposta.codigo.count("caixa('Perna") == 4 and blender.executados == []  # RF6: espera o clique
+    assert llm.chamadas[0]["ferramentas"] == set()  # a LLM não escreve código: só explica
+
+    for n in (2, 3):
+        assert "próximo" in ag.executar(estado).texto
+        resposta = ag.responder(estado, "próximo")
+        assert f"Passo {n} de 3" in resposta.texto
+    resposta = ag.executar(estado)
+    assert "Tarefa concluída" in resposta.texto and estado.plano is None and not estado.em_ensino
+    assert len(blender.executados) == 3 and "Tampo" in blender.executados[2]
+
+
+def test_cancelar_no_plano_mostra_o_mesmo_passo_de_novo(banco):
+    llm = LLMFalsa(mensagem("Explico."), mensagem("Explico de novo."), ficha=FICHA_MESA)
+    ag = Agente(BlenderFalso(), None, banco, conversar=llm)
+    estado = novo_estado(banco, ENSINAR)
+    primeira = ag.responder(estado, "me ensina a fazer uma mesa")
+    assert "ver este passo de novo" in ag.cancelar(estado).texto
+    segunda = ag.responder(estado, "próximo")
+    assert "Passo 1 de 3" in segunda.texto and segunda.codigo == primeira.codigo
+
+
+def test_descrever_passo_em_palavras():
+    codigo = ("cor = '#111111'\ncilindro('Roda1', 0.175, 0.4, x=1, cor=cor, eixo='x')\n"
+              "cilindro('Roda2', 0.175, 0.4, x=-1, cor=cor, eixo='x')\ncaixa('Tampo', 1.2, 0.8, 0.04, base=0.71)")
+    assert agente.descrever_passo(codigo) == (
+        "- 2 x Cilindro de diâmetro 0,35 m, deitado, comprimento 0,40 m, apoiado no chão\n"
+        "- Cubo de 1,20 m x 0,80 m, altura 0,04 m, começando a 0,71 m do chão")

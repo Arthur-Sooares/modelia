@@ -79,6 +79,13 @@ def test_rodas_deitadas_nos_lados_da_carroceria():
         peca("Roda", "cilindro", 0.6, 0.6, 0.2, "rodas", "Carroceria")]}))[0]
 
 
+def test_rodas_listadas_uma_por_uma_nao_viram_16():
+    pecas = colocar(peca("Carroceria", "caixa", 4, 1.8, 0.8, altura_do_chao=0.3),
+                    *(peca(f"Roda{lado}", "cilindro", 0.6, 0.6, 0.2, "rodas", "Carroceria")
+                      for lado in ("EsquerdaFrente", "DireitaFrente", "EsquerdaTras", "DireitaTras")))
+    assert len([n for n in pecas if n.startswith("Roda")]) == 4
+
+
 def test_toda_a_biblioteca_monta_codigo_valido():
     from modelia.exemplos_fichas import EXEMPLOS
     for nomes, ficha in EXEMPLOS:

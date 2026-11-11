@@ -164,8 +164,15 @@ def _limpar(dados):
     """Confere e completa a ficha da LLM. Devolve (objeto, peças). ValueError se faltar o essencial."""
     if not isinstance(dados, dict) or not isinstance(dados.get("pecas"), list) or not dados["pecas"]:
         raise ValueError("a ficha não tem peças")
-    pecas, nomes = [], set()
+    pecas, nomes, grupos = [], set(), set()
     for bruta in dados["pecas"][:MAX_PECAS]:
+        # "rodas" e "embaixo_cantos" já criam as 4. O qwen3.5:4b às vezes lista RodaEsquerdaFrente,
+        # RodaDireitaFrente... cada uma com posicao "rodas", e saíam 16 rodas (11/11/2026).
+        grupo = (bruta.get("posicao"), str(bruta.get("de", "")).strip().replace(" ", ""))
+        if grupo[0] in ("rodas", "embaixo_cantos"):
+            if grupo in grupos:
+                continue
+            grupos.add(grupo)
         try:
             forma = bruta["forma"] if bruta["forma"] in FORMAS else "caixa"
             p = {"nome": str(bruta["nome"]).strip().replace(" ", "") or "Peca",
