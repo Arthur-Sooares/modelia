@@ -48,7 +48,7 @@ O app antigo em Gradio continua em http://127.0.0.1:7860/app.
 | `modelia/interface.py` | Telas e abas em Gradio | RF1 a RF10, RNF1, RNF2, RNF5, RNF6 |
 | `modelia/pesquisador.py` | API das telas do Pesquisador (`site/pesquisador.html`) | RF3, RF8, RF9, RF10 |
 | `modelia/preparar.py` | Instala o Ollama, baixa os modelos e o manual | |
-| `modelia/agente.py` | Orquestrador dos modos Explicar, Demonstrar e Verificar | RF4 a RF7 |
+| `modelia/agente.py` | Orquestrador dos modos Explicar, Ensinar e Demonstrar | RF4 a RF6 |
 | `modelia/blender.py` | Cliente MCP do Blender | RNF8 |
 | `modelia/llm.py` | Conversa com o Ollama e gerência de modelos | RF3, RNF3 |
 | `modelia/conhecimento.py` | Base de conhecimento (RAG com ChromaDB) | RF8 |

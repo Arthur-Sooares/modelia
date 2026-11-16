@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from modelia import agente, receitas
-from modelia.agente import DEMONSTRAR, ENSINAR, EXPLICAR, VERIFICAR, Agente, Estado
+from modelia.agente import DEMONSTRAR, ENSINAR, EXPLICAR, Agente, Estado
 from modelia.banco import Banco
 
 
@@ -191,25 +191,6 @@ def test_explicar_sem_material_nao_chama_a_llm(banco):
     ag = Agente(BlenderFalso(), ConhecimentoFalso([]), banco, conversar=llm)
     resposta = ag.responder(novo_estado(banco, EXPLICAR), "quem ganhou a copa?")
     assert "não cobre" in resposta.texto and llm.chamadas == []
-
-
-def test_verificar_so_oferece_ferramentas_de_leitura(banco):
-    cena = {"malhas": [{"nome": "Cube", "dim": [2.0, 2.0, 2.0], "local": [0, 0, 1], "z_min": 0.0, "z_max": 2.0}],
-            "outros": []}
-    llm = LLMFalsa(mensagem("", leitura="get_objects_summary"), mensagem("Está certo!"))
-    blender = BlenderFalso(cena=cena)
-    ag = Agente(blender, None, banco, conversar=llm)
-    resposta = ag.responder(novo_estado(banco, VERIFICAR), "minha cena está certa?", tarefa_id="cubo")
-    assert "execute_blender_code" not in llm.chamadas[0]["ferramentas"]
-    assert blender.executados == []
-    assert resposta.texto == "Está certo!"
-    assert resposta.detalhes["tarefa"] == "Cubo no chão" and resposta.detalhes["nota"] == 3
-
-
-def test_verificar_cena_vazia_sugere_ensinar(banco):
-    ag = Agente(BlenderFalso(), None, banco, conversar=LLMFalsa())
-    resposta = ag.responder(novo_estado(banco, VERIFICAR), "está certo?", tarefa_id="mesa")
-    assert "passo a passo" in resposta.texto
 
 
 def test_tudo_fica_registrado_no_historico(banco):

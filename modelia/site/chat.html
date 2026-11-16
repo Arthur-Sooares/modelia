@@ -20,7 +20,6 @@
     <button class="item" data-modo="Explicar" type="button"><img src="img/ponto-azul-8.svg" alt="">Tenho uma dúvida</button>
     <button class="item" data-modo="Ensinar" type="button"><img src="img/ponto-laranja-8.svg" alt="">Me ensina passo a passo</button>
     <button class="item" data-modo="Demonstrar" type="button"><img src="img/ponto-tinta-8.svg" alt="">Faz pra mim</button>
-    <button class="item" data-modo="Verificar" type="button"><img src="img/ponto-verde-8.svg" alt="">Confere meu trabalho</button>
   </nav>
 
   <nav class="grupo" id="hoje" aria-label="Suas conversas de hoje" hidden>
@@ -47,9 +46,7 @@
           <span class="sugestao-modo"><img src="img/ponto-azul-7.svg" alt="">Tenho uma dúvida</span>Ex.: o que é extrusão e quando usar?</button>
         <button class="sugestao entra" style="--d:.5s" data-modo="Ensinar" data-pedido="Me ensina a fazer uma mesa" type="button">
           <span class="sugestao-modo"><img src="img/ponto-laranja-7.svg" alt="">Me ensina passo a passo</span>Ex.: me ensina a fazer uma mesa</button>
-        <button class="sugestao entra" style="--d:.6s" data-modo="Verificar" data-pedido="Minha mesa está certa?" type="button">
-          <span class="sugestao-modo"><img src="img/ponto-verde-7.svg" alt="">Confere meu trabalho</span>Ex.: minha cadeira está certa?</button>
-        <button class="sugestao entra" style="--d:.7s" data-modo="Demonstrar" data-pedido="Faz uma mesa com cadeira" type="button">
+        <button class="sugestao entra" style="--d:.6s" data-modo="Demonstrar" data-pedido="Faz uma mesa com cadeira" type="button">
           <span class="sugestao-modo"><img src="img/ponto-tinta-7.svg" alt="">Faz pra mim</span>Ex.: faz uma mesa com cadeira</button>
       </div>
     </div>
@@ -64,17 +61,11 @@
           <button type="button" data-modo="Explicar" title="Tenho uma dúvida">Dúvida</button>
           <button type="button" data-modo="Ensinar" title="Me ensina passo a passo">Passo a passo</button>
           <button type="button" data-modo="Demonstrar" title="Faz pra mim">Faz pra mim</button>
-          <button type="button" data-modo="Verificar" title="Confere meu trabalho">Conferir</button>
         </div>
-        <label class="tarefa" id="tarefa-rotulo" hidden>
-          <span class="sr">Tarefa-meta</span>
-          <select id="tarefa"></select><span aria-hidden="true">▾</span>
-        </label>
         <button class="enviar" id="enviar" type="submit" aria-label="Enviar">
           <img data-modo="Explicar" src="img/enviar-azul.svg" alt="">
           <img data-modo="Ensinar" src="img/enviar-laranja.svg" alt="">
           <img data-modo="Demonstrar" src="img/enviar-tinta.svg" alt="">
-          <img data-modo="Verificar" src="img/enviar-verde.svg" alt="">
         </button>
       </div>
     </div>
@@ -89,10 +80,6 @@
   </div>
   <div class="viewport" id="viewport"><p>Carregando a cena…</p></div>
   <p class="painel-nota">Atualiza sozinha depois de cada passo.</p>
-  <div class="painel-cartao" id="painel-tarefa" hidden>
-    <p class="painel-cartao-titulo"></p>
-    <ul></ul>
-  </div>
 </aside>
 
 <section class="tela-cheia" id="abrindo" hidden aria-live="polite">
@@ -153,12 +140,6 @@
       <button class="botao-chat laranja-fundo" type="button"></button>
       <details><summary>Ver detalhes técnicos</summary><p class="problema-detalhe"></p></details>
     </div>
-  </div>
-</template>
-<template id="tpl-resultado">
-  <div class="resultado">
-    <p class="resultado-topo"><span></span><span class="nota"></span></p>
-    <ul></ul>
   </div>
 </template>
 

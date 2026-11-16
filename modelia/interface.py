@@ -17,7 +17,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from modelia import config, experimento, llm, preparar
-from modelia.agente import DEMONSTRAR, ENSINAR, EXPLICAR, MODOS, VERIFICAR, Agente, Estado
+from modelia.agente import DEMONSTRAR, ENSINAR, EXPLICAR, MODOS, Agente, Estado
 from modelia.api import criar_api
 from modelia.banco import Banco, para_csv
 from modelia.blender import Blender
@@ -31,8 +31,6 @@ AJUDA_MODOS = {
              "Blender, explica o atalho e só executa depois do seu clique em Executar.",
     DEMONSTRAR: "Peça um objeto (ex.: \"crie uma mesa\"). O Modelia cria tudo sozinho no Blender, confere "
                 "a cena e corrige o que ficou fora do lugar.",
-    VERIFICAR: "Faça a tarefa sozinho no Blender, escolha a tarefa-meta e pergunte \"minha cena está certa?\". "
-               "Nada na sua cena é alterado.",
 }
 PASTA_SITE = Path(__file__).parent / "site"
 ESCOLHAS_TAREFAS = [(t.nome, t.id) for t in TAREFAS.values()]
@@ -120,7 +118,7 @@ def criar_app(servicos=None):
             s.blender.captura() if resposta.atualizar_cena else gr.skip(),
         )
 
-    def enviar(mensagem, historico, estado, tarefa):
+    def enviar(mensagem, historico, estado):
         """Saídas: mensagem, chat, código, botões, cena. Mostra a pergunta antes de a LLM responder."""
         if not estado:
             raise gr.Error("Identifique-se primeiro.")
@@ -133,7 +131,7 @@ def criar_app(servicos=None):
         historico = historico + [{"role": "user", "content": mensagem}]
         yield "", historico, gr.skip(), gr.skip(), gr.skip()
         try:
-            resposta = s.agente.responder(estado, mensagem, tarefa_id=tarefa or "")
+            resposta = s.agente.responder(estado, mensagem)
         except Exception as erro:
             raise gr.Error(f"Algo deu errado: {erro}") from erro
         yield "", *mostrar(resposta, historico)
@@ -149,7 +147,7 @@ def criar_app(servicos=None):
     def trocar_modo(modo, estado):
         if estado:
             s.agente.trocar_modo(estado, modo)
-        return (gr.Dropdown(visible=modo == VERIFICAR), AJUDA_MODOS[modo],
+        return (AJUDA_MODOS[modo],
                 gr.Code(value="", visible=False), gr.Row(visible=False))
 
     def trocar_modelo(modelo, estado):
@@ -322,10 +320,8 @@ def criar_app(servicos=None):
                                                      info="A LLM que vai responder. Roda neste computador.")
                                 modo = gr.Radio(MODOS, value=EXPLICAR, label="Modo",
                                                 info="Explicar tira dúvidas, Ensinar faz passo a passo, "
-                                                     "Demonstrar cria sozinho, Verificar corrige a sua cena.")
+                                                     "Demonstrar cria sozinho.")
                             ajuda_modo = gr.Markdown(AJUDA_MODOS[EXPLICAR])
-                            tarefa = gr.Dropdown(ESCOLHAS_TAREFAS, label="Tarefa-meta", visible=False,
-                                                 info="A tarefa que você fez e quer que o Modelia confira.")
                             chat = gr.Chatbot(label="Conversa", height=460)
                             codigo = gr.Code(label="Código proposto (ainda NÃO executado)", language="python",
                                              interactive=False, visible=False)
@@ -429,12 +425,12 @@ def criar_app(servicos=None):
 
         botao_situacao.click(situacao, None, situacao_md)
         botao_cena.click(lambda: s.blender.captura(), None, cena)
-        modo.change(trocar_modo, [modo, estado], [tarefa, ajuda_modo, codigo, botoes_codigo])
+        modo.change(trocar_modo, [modo, estado], [ajuda_modo, codigo, botoes_codigo])
         modelo.change(trocar_modelo, [modelo, estado], None)
 
         saida_chat = [mensagem, chat, codigo, botoes_codigo, cena]
-        botao_enviar.click(enviar, [mensagem, chat, estado, tarefa], saida_chat)
-        mensagem.submit(enviar, [mensagem, chat, estado, tarefa], saida_chat)
+        botao_enviar.click(enviar, [mensagem, chat, estado], saida_chat)
+        mensagem.submit(enviar, [mensagem, chat, estado], saida_chat)
         botao_executar.click(executar, [chat, estado], [chat, codigo, botoes_codigo, cena])
         botao_cancelar.click(cancelar, [chat, estado], [chat, codigo, botoes_codigo, cena])
 

@@ -48,7 +48,7 @@
       <p class="abs pergunta" data-entra style="--d:1.8s; --dy:14px; --do:.3s; --dt:.5s">Como faço uma mesa?</p>
       <p class="abs balao" data-entra style="--d:2.6s; --dy:14px; --do:.3s; --dt:.5s">Vamos por partes. Passo 1: o tampo. Aperte Shift + A e adicione um cubo.</p>
       <div class="abs hero-base" data-entra style="--d:.55s; --dy:24px; --do:.54s; --dt:.9s">
-        <p>Abra o Blender, pergunte em português e aprenda fazendo. O Modelia explica, mostra o passo a passo na sua cena e confere o que você modelou.</p>
+        <p>Abra o Blender, pergunte em português e aprenda fazendo. O Modelia explica, mostra o passo a passo na sua cena e monta o objeto pra você estudar.</p>
         <div class="ctas">
           <a class="botao botao-laranja" href="/chat.html">Começar</a>
           <a class="link-seta" href="#como-funciona">Ver como funciona <span>↓</span></a>
@@ -93,7 +93,7 @@
           <div class="passo-imagem"><img src="img/etapa-final.png" alt=""></div>
           <p class="passo-numero">03 / 03</p>
           <h3>Aprenda fazendo.</h3>
-          <p>Ele explica, mostra na sua cena, você repete e ele confere.</p>
+          <p>Ele explica, mostra na sua cena e você repete.</p>
         </div></li>
       </ol>
     </section>
@@ -167,46 +167,6 @@
       <p class="abs pergunta" data-entra style="--d:1.8s; --dy:14px; --do:.3s; --dt:.5s">Faz uma mesa com cadeira?</p>
       <p class="abs balao" data-entra style="--d:2.6s; --dy:14px; --do:.3s; --dt:.5s">Pronto. Tampo a 75 cm, quatro pernas e uma cadeira. Conferi as medidas e corrigi a altura das pernas.</p>
       <p class="abs rotulo-viewport mono" data-entra style="--d:1.3s; --dy:0px; --do:.4s">3 de 3 medidas conferidas</p>
-    </section>
-
-    <section class="palco verificar" data-cena data-estado="antes" data-alterna>
-      <div class="abs imagens">
-        <img class="troca-imagem" data-so="antes" src="img/etapa-antes.png" alt="Mesa com as pernas 5 cm acima do chão">
-        <img class="troca-imagem" data-so="depois" src="img/etapa-final.png" alt="Mesa com as pernas tocando o chão">
-      </div>
-      <div class="cota" aria-hidden="true">
-        <img class="abs" data-so="antes" style="left:1261.3px; top:518.3px" src="img/cota-vao.svg" alt="">
-        <img class="abs" data-so="antes" style="left:1258.5px; top:515.5px" src="img/ponto-laranja-7.svg" alt="">
-        <img class="abs" data-so="antes" style="left:1258.5px; top:533.5px" src="img/ponto-laranja-7.svg" alt="">
-        <img class="abs" data-risca style="left:834.3px; top:314.3px; --d:.8s" src="img/cota-largura.svg" alt="">
-        <img class="abs" data-entra style="left:831.5px; top:311.5px; --d:.8s; --dy:0px; --do:.15s" src="img/ponto-tinta-7.svg" alt="">
-        <img class="abs" data-entra style="left:1281.5px; top:341.5px; --d:1.6s; --dy:0px; --do:.15s" src="img/ponto-tinta-7.svg" alt="">
-        <p class="abs cota-texto" data-entra style="left:1010px; top:292px; --d:1.5s; --dy:6px; --do:.4s; --dt:.4s">2,00 m</p>
-        <img class="abs" data-risca="v" style="left:1311.3px; top:379.3px; --d:1.9s" src="img/cota-altura.svg" alt="">
-        <img class="abs" data-entra style="left:1308.5px; top:376.5px; --d:1.9s; --dy:0px; --do:.15s" src="img/ponto-tinta-7.svg" alt="">
-        <img class="abs" data-entra style="left:1308.5px; top:532.5px; --d:2.7s; --dy:0px; --do:.15s" src="img/ponto-tinta-7.svg" alt="">
-        <p class="abs cota-texto" data-entra style="left:1326px; top:446px; --d:2.6s; --dy:6px; --do:.4s; --dt:.4s">0,75 m</p>
-      </div>
-      <p class="abs cota-texto cota-erro" data-so="antes">5 cm acima do chão</p>
-      <p class="abs cota-texto cota-certo" data-so="depois">✓ no chão</p>
-      <div class="abs texto-modo" data-entra style="--d:.1s">
-        <p class="etiqueta-modo"><img src="img/ponto-verde-10.svg" alt="">Modo Verificar</p>
-        <h2 class="titulo"><span>Fez sozinho?</span><span>Ele confere.</span></h2>
-        <p class="lead">O Modelia mede a sua cena, diz o que está certo e o que falta, e dá uma dica. Nunca altera o seu trabalho.</p>
-      </div>
-      <div class="abs resultado" aria-live="polite">
-        <p class="resultado-topo">Tarefa: Mesa <span class="nota" data-so="antes">nota 2 de 3</span><span class="nota nota-ok" data-so="depois">nota 3 de 3</span></p>
-        <ul>
-          <li>Tampo a 75 cm do chão</li>
-          <li>Quatro pernas iguais</li>
-          <li class="falta" data-so="antes">Pernas 5 cm acima do chão</li>
-          <li data-so="depois">Pernas tocando o chão</li>
-        </ul>
-      </div>
-      <div class="abs seletor" role="group" aria-label="Cena do aluno">
-        <button value="antes" aria-pressed="true"><img class="ativo" src="img/ponto-laranja-8.svg" alt=""><img class="inativo" src="img/ponto-cinza-8.svg" alt="">antes</button>
-        <button value="depois" aria-pressed="false"><img class="ativo" src="img/ponto-verde-8.svg" alt=""><img class="inativo" src="img/ponto-cinza-8.svg" alt="">depois</button>
-      </div>
     </section>
 
     <section class="secao grande diferencial" data-cena>

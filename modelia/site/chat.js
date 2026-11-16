@@ -1,17 +1,15 @@
 // Chat do Modelia. Conversa com a API em /api (modelia/api.py), que usa o mesmo agente do app.
-// Telas do Figma: "3 · Chat (novo)" a "6 · Chat (Verificar)" e "Melhorias para o aluno (UX)" (13 a 14 e 0).
+// Telas do Figma: "3 · Chat (novo)" a "5 · Chat" e "Melhorias para o aluno (UX)" (13 a 14 e 0).
 
 const $ = (seletor) => document.querySelector(seletor);
-const MODOS = ["Explicar", "Ensinar", "Demonstrar", "Verificar"];
+const MODOS = ["Explicar", "Ensinar", "Demonstrar"];
 // O aluno vê os modos como frases; os nomes técnicos ficam no código, no banco e nas telas do professor.
-const NOME = { Explicar: "Tenho uma dúvida", Ensinar: "Me ensina passo a passo", Demonstrar: "Faz pra mim",
-  Verificar: "Confere meu trabalho" };
+const NOME = { Explicar: "Tenho uma dúvida", Ensinar: "Me ensina passo a passo", Demonstrar: "Faz pra mim" };
 const PLACEHOLDER = "Escreva aqui o que você quer…";
 const NO_ENSINO = "Escreva “próximo” ou “parar”…";
 const AVISO = {
   Explicar: "Isso não mexe na sua cena.",
   Demonstrar: `Agora estude cada peça: selecione um objeto e pergunte em “${NOME.Explicar}”.`,
-  Verificar: "Conferir não altera nada na sua cena.",
 };
 
 const pedidoNoEndereco = decodeURIComponent(location.hash.slice(1));
@@ -20,7 +18,6 @@ let modo = MODOS.includes(pedidoNoEndereco) ? pedidoNoEndereco : "Ensinar";
 let modoEscolhido = MODOS.includes(pedidoNoEndereco);
 let modelo = "";        // o modelo padrão que o professor escolheu (o aluno não escolhe)
 let tempoTipico = {};   // segundos típicos de cada modo neste computador, para a estimativa de espera
-let tarefas = [];
 let atual = null; // conversa aberta: {id, titulo, elemento, emEnsino, ocupado, botao}
 const conversas = [];
 const DECISAO = { executado: "Executado no Blender", cancelado: "Cancelado", nao_executado: "Não executado" };
@@ -107,11 +104,6 @@ async function situacao() {
   $("#cena-rotulo").innerHTML = s.blender ? 'Cena<span class="cena-extra"> do Blender</span>' : "Blender fechado";
   modelo = s.modelo;
   tempoTipico = s.tempo_tipico || {};
-  if (!tarefas.length) {
-    tarefas = s.tarefas;
-    $("#tarefa").replaceChildren(...tarefas.map((t) => new Option(`Tarefa: ${t.nome}`, t.id, false, t.id === "mesa")));
-    mostrarTarefa();
-  }
   return pronto;
 }
 
@@ -252,24 +244,6 @@ function cartaoEspera(corpo, pedido) {
   return { etapa, tempo: el.querySelector(".espera-tempo") };
 }
 
-function cartaoResultado({ tarefa, nota, certo, falta }) {
-  const el = $("#tpl-resultado").content.firstElementChild.cloneNode(true);
-  const [titulo, pilula] = el.querySelectorAll(".resultado-topo span");
-  titulo.textContent = `Tarefa: ${tarefa}`;
-  pilula.textContent = `Nota ${nota} de 3`;
-  pilula.classList.toggle("cheia", nota === 3);
-  const ul = el.querySelector("ul");
-  for (const [itens, classe] of [[certo, ""], [falta, "falta"]]) {
-    for (const item of itens) {
-      const li = document.createElement("li");
-      li.textContent = item;
-      if (classe) li.className = classe;
-      ul.append(li);
-    }
-  }
-  return el;
-}
-
 function cartaoCodigo(codigo) {
   const el = $("#tpl-codigo").content.firstElementChild.cloneNode(true);
   el.querySelector("pre").textContent = codigo;
@@ -307,7 +281,7 @@ function cartaoProblema({ titulo, texto, passos = [], botao, tentar, detalhe = "
   return el;
 }
 
-const PARA_EU = { Explicar: "olhar a sua cena", Ensinar: "te ensinar no Blender", Verificar: "conferir o seu trabalho" };
+const PARA_EU = { Explicar: "olhar a sua cena", Ensinar: "te ensinar no Blender" };
 
 function blenderFechado(r, modoDaResposta, pedido, corpo) {
   const acao = modoDaResposta === "Demonstrar" ? `montar ${objetoDoPedido(pedido).o}` : PARA_EU[modoDaResposta];
@@ -352,7 +326,6 @@ function mostrarResposta(corpo, r, modoDaResposta, pedido = "") {
     texto = texto.slice(0, marca.index);
   }
   texto = texto.replace(/\n*\*Veja a cena ao lado\.\*\s*$/, "");
-  if (r.detalhes) corpo.append(cartaoResultado(r.detalhes));
   corpo.append(...blocos(texto));
   if (r.codigo) corpo.append(cartaoCodigo(r.codigo));
   if (fontes) {
@@ -446,7 +419,6 @@ async function pedir(chamada, { corpo = null, modoDoPedido = modo, inicio = Date
 function mandar(texto, modoDoPedido = modo, corpo = null) {
   return pedir((avisos) => fluxo("/api/mensagem", {
     conversa: atual.id, texto, modo: modoDoPedido, modelo,
-    tarefa: modoDoPedido === "Verificar" ? $("#tarefa").value : "",
   }, avisos), { corpo, modoDoPedido, pedido: texto });
 }
 
@@ -627,7 +599,7 @@ function marcarHoje() {
   for (const c of conversas) c.botao.setAttribute("aria-current", c === atual);
 }
 
-// --- modo, tarefa e painel ---
+// --- modo e painel ---
 
 function ajustarPlaceholder() {
   $("#texto").placeholder = atual?.emEnsino && modo === "Ensinar" ? NO_ENSINO : PLACEHOLDER;
@@ -638,20 +610,7 @@ function escolherModo(novo) {
   document.body.dataset.modo = novo;
   for (const b of document.querySelectorAll(".lateral [data-modo]")) b.setAttribute("aria-current", b.dataset.modo === novo);
   for (const b of document.querySelectorAll(".modos button")) b.setAttribute("aria-pressed", b.dataset.modo === novo);
-  $("#tarefa-rotulo").hidden = novo !== "Verificar";
   ajustarPlaceholder();
-  mostrarTarefa();
-}
-
-function mostrarTarefa() {
-  const cartao = $("#painel-tarefa");
-  const tarefa = tarefas.find((t) => t.id === $("#tarefa").value);
-  cartao.hidden = modo !== "Verificar" || !tarefa;
-  if (cartao.hidden) return;
-  cartao.querySelector(".painel-cartao-titulo").textContent = `O que a tarefa “${tarefa.nome}” pede`;
-  const li = document.createElement("li");
-  li.textContent = tarefa.pedido;
-  cartao.querySelector("ul").replaceChildren(li);
 }
 
 let urlCena = "";
@@ -731,7 +690,6 @@ $("#nova").addEventListener("click", () => {
   fecharMenu();
   $("#texto").focus();
 });
-$("#tarefa").addEventListener("change", mostrarTarefa);
 $("#botao-cena").addEventListener("click", () => alternarPainel());
 $("#atualizar").addEventListener("click", atualizarCena);
 $("#menu").addEventListener("click", () => $("#lateral").classList.toggle("aberta"));

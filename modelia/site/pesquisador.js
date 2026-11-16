@@ -4,9 +4,9 @@
 
 const $ = (seletor) => document.querySelector(seletor);
 const TELAS = ["modelos", "conhecimento", "historico", "experimento", "instalacao"];
-const MODOS = ["Explicar", "Ensinar", "Demonstrar", "Verificar"];
+const MODOS = ["Explicar", "Ensinar", "Demonstrar"];
 // Cor dos números em Histórico: as versões "-texto" têm contraste suficiente sobre o cartão claro.
-const COR_MODO = { Explicar: "var(--azul)", Ensinar: "var(--laranja-texto)", Demonstrar: "var(--laranja-texto)", Verificar: "var(--verde-texto)" };
+const COR_MODO = { Explicar: "var(--azul)", Ensinar: "var(--laranja-texto)", Demonstrar: "var(--laranja-texto)" };
 
 let senha = lerSenha();
 let tela = "";

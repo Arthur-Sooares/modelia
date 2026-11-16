@@ -20,7 +20,6 @@ from pydantic import BaseModel
 
 from modelia import config, llm
 from modelia.agente import MODOS, Estado
-from modelia.tarefas import TAREFAS
 
 # ponytail: identificador fixo até a tela de entrar voltar (RF1); aí vem do login.
 IDENTIFICADOR = "visitante"
@@ -32,7 +31,6 @@ class Mensagem(BaseModel):
     texto: str
     modo: str
     modelo: str = ""
-    tarefa: str = ""
 
 
 class Acao(BaseModel):
@@ -72,7 +70,7 @@ def nomes_de_modelos():
 
 def para_json(resposta):
     return {"texto": resposta.texto, "codigo": resposta.codigo,
-            "atualizar_cena": resposta.atualizar_cena, "detalhes": resposta.detalhes, "problema": resposta.problema}
+            "atualizar_cena": resposta.atualizar_cena, "problema": resposta.problema}
 
 
 def linha(item):
@@ -160,7 +158,6 @@ def criar_api(s):
         return {
             "ollama": llm.disponivel(), "blender": s.blender.disponivel(),
             "conhecimento_vazio": s.conhecimento.vazia(), "modelos": modelos, "modelo": padrao,
-            "tarefas": [{"id": t.id, "nome": t.nome, "pedido": t.pedido} for t in TAREFAS.values()],
             # Ainda ligando o Ollama e carregando o modelo: o chat mostra "Abrindo o Modelia…" em vez de "Quase lá".
             "preparando": config.PREPARANDO.is_set(),
             # Segundos típicos por modo neste computador, para a estimativa de espera.
@@ -204,7 +201,7 @@ def criar_api(s):
         if not c.estado.modelo:
             raise HTTPException(400, "Nenhum modelo de LLM instalado. Peça ao Pesquisador para baixar um.")
         c.decidir("nao_executado", todos=True)  # mensagem nova cancela o código que esperava o clique
-        return responder(c, s.agente.responder, c.estado, m.texto, m.tarefa, pedido=m.texto)
+        return responder(c, s.agente.responder, c.estado, m.texto, pedido=m.texto)
 
     @api.post("/executar")
     def executar(a: Acao):

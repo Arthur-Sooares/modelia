@@ -12,7 +12,7 @@ Estudantes de Sistemas de Informação do IFNMG Campus Januária aprendendo mode
 
 ## Product Purpose
 
-Tutor de Blender com IA que roda localmente (Ollama). Três modos: Explicar (responde com o material da disciplina e cita a fonte), Demonstrar (faz passo a passo no Blender e só executa depois do clique do aluno) e Verificar (mede a cena do aluno e diz o que ajustar). Sucesso: o aluno sai da página querendo entrar e entende em segundos o que o Modelia faz.
+Tutor de Blender com IA que roda localmente (Ollama). Três modos: Explicar (responde com o material da disciplina e cita a fonte), Ensinar (faz passo a passo no Blender e só executa depois do clique do aluno) e Demonstrar (monta o objeto inteiro para o aluno estudar). Sucesso: o aluno sai da página querendo entrar e entende em segundos o que o Modelia faz.
 
 ## Brand Personality
 

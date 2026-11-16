@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from modelia.agente import EXPLICAR, VERIFICAR, Resposta
+from modelia.agente import DEMONSTRAR, EXPLICAR, Resposta
 from modelia.api import criar_api
 from modelia.banco import Banco
 
@@ -17,10 +17,10 @@ class AgenteFalso:
     def __init__(self):
         self.trocas = []
 
-    def responder(self, estado, mensagem, tarefa_id="", ao_escrever=None, ao_avisar=None):
+    def responder(self, estado, mensagem, ao_escrever=None, ao_avisar=None):
         ao_avisar("Planejando")
         ao_escrever("pensando...")
-        return Resposta(f"{estado.modo}: {mensagem} ({estado.modelo})", detalhes={"tarefa": tarefa_id} or None)
+        return Resposta(f"{estado.modo}: {mensagem} ({estado.modelo})")
 
     def trocar_modo(self, estado, modo):
         self.trocas.append(modo)
@@ -45,10 +45,9 @@ def test_conversa_troca_de_modo_e_responde(tmp_path):
     r = c.post("/api/mensagem", json={"conversa": conversa, "texto": "oi", "modo": EXPLICAR, "modelo": "m1"})
     assert r.status_code == 200 and linhas(r) == [
         {"etapa": "Planejando"}, {"parcial": "pensando..."},
-        {"fim": {"texto": "Explicar: oi (m1)", "codigo": "", "atualizar_cena": False, "detalhes": {"tarefa": ""},
-                 "problema": ""}}]
-    r = c.post("/api/mensagem", json={"conversa": conversa, "texto": "certo?", "modo": VERIFICAR, "tarefa": "mesa"})
-    assert linhas(r)[-1]["fim"]["detalhes"] == {"tarefa": "mesa"} and s.agente.trocas == [VERIFICAR]  # modelo m1 continua
+        {"fim": {"texto": "Explicar: oi (m1)", "codigo": "", "atualizar_cena": False, "problema": ""}}]
+    r = c.post("/api/mensagem", json={"conversa": conversa, "texto": "mesa", "modo": DEMONSTRAR})
+    assert linhas(r)[-1]["fim"]["texto"] == "Demonstrar: mesa (m1)" and s.agente.trocas == [DEMONSTRAR]  # modelo m1 continua
 
 
 def test_erros_claros(tmp_path):
@@ -77,7 +76,7 @@ def test_resposta_continua_sem_a_pagina_e_pode_ser_retomada(tmp_path):
     c, s = cliente(tmp_path)
     liberar = threading.Event()
 
-    def responder_devagar(estado, mensagem, tarefa_id="", ao_escrever=None, ao_avisar=None):
+    def responder_devagar(estado, mensagem, ao_escrever=None, ao_avisar=None):
         ao_escrever("metade")
         liberar.wait(5)
         return Resposta("tudo")

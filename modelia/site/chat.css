@@ -1,4 +1,4 @@
-/* Chat do Modelia: telas "3 · Chat (novo)" a "6 · Chat (Verificar)" do Figma (versão 2) e
+/* Chat do Modelia: telas "3 · Chat (novo)" a "5 · Chat" do Figma (versão 2) e
    "Melhorias para o aluno (UX)": 13 a 13d (chat), 14 (Quase lá) e 0 (Abrindo o Modelia). */
 
 * { box-sizing: border-box; margin: 0; }
@@ -21,7 +21,6 @@ button { border: 0; background: none; cursor: pointer; touch-action: manipulatio
 [data-modo="Explicar"] { --cor-modo: var(--azul); --sobre-modo: #fff; }
 [data-modo="Ensinar"] { --cor-modo: var(--laranja); --sobre-modo: var(--tinta); }
 [data-modo="Demonstrar"] { --cor-modo: var(--tinta); --sobre-modo: var(--cartao); }
-[data-modo="Verificar"] { --cor-modo: var(--verde); --sobre-modo: var(--tinta); }
 
 /* --- menu lateral --- */
 .lateral { width: 272px; flex: none; height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 24px;
@@ -57,9 +56,9 @@ button { border: 0; background: none; cursor: pointer; touch-action: manipulatio
 .pilula { display: flex; gap: 8px; align-items: center; padding: 8px 14px; border-radius: 999px; background: var(--cartao); border: 1px solid var(--borda);
   font-weight: 600; font-size: 14px; white-space: nowrap; }
 .modelo { position: relative; padding: 0; }
-.modelo select, .tarefa select { appearance: none; border: 0; background: none; font-weight: 600; cursor: pointer; }
+.modelo select { appearance: none; border: 0; background: none; font-weight: 600; cursor: pointer; }
 .modelo select { padding: 8px 32px 8px 14px; font-size: 14px; border-radius: 999px; }
-.modelo span[aria-hidden], .tarefa span[aria-hidden] { position: absolute; right: 14px; pointer-events: none; font-weight: 400; font-size: 13px; color: var(--texto-2); }
+.modelo span[aria-hidden] { position: absolute; right: 14px; pointer-events: none; font-weight: 400; font-size: 13px; color: var(--texto-2); }
 #botao-cena[aria-expanded="true"] { background: #dadde3; }
 
 .centro { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; padding: 0 24px 12px; }
@@ -107,16 +106,6 @@ button { border: 0; background: none; cursor: pointer; touch-action: manipulatio
 .codigo.feito { border-color: #3a3a44; }
 .codigo.feito .pisca { animation: none; opacity: .4; }
 
-/* resultado (Verificar) */
-.resultado { width: 100%; border-radius: 20px; overflow: hidden; background: var(--cartao); border: 1px solid var(--borda); line-height: normal; }
-.resultado-topo { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; background: var(--lateral); font-weight: 600; font-size: 15px; }
-.nota { padding: 7px 12px; border-radius: 999px; background: #ffe6d6; color: #b5470a; font-size: 13px; }
-.nota.cheia { background: #ddf3e5; color: #17733e; }
-.resultado ul { padding: 16px 18px; list-style: none; display: flex; flex-direction: column; gap: 12px; }
-.resultado li { display: flex; gap: 12px; align-items: baseline; font-weight: 500; font-size: 15px; }
-.resultado li::before { content: "✓"; font-weight: 600; font-size: 16px; color: var(--verde); }
-.resultado li.falta::before { content: "✗"; color: #b5470a; }
-
 /* --- compositor --- */
 .compositor { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 0 24px 24px; }
 .caixa { width: min(760px, 100%); display: flex; flex-direction: column; gap: 14px; padding: 18px 14px 14px 22px; border-radius: 28px;
@@ -129,14 +118,10 @@ button { border: 0; background: none; cursor: pointer; touch-action: manipulatio
 .modos button { padding: 13px 16px; border-radius: 999px; font-weight: 600; font-size: 14px; line-height: normal; color: var(--texto-2); white-space: nowrap; transition: background-color .2s, color .2s; }
 .modos button:hover { color: var(--tinta); }
 .modos button[aria-pressed="true"] { background: var(--cor-modo); color: var(--sobre-modo); }
-.tarefa { position: relative; margin-left: auto; display: flex; align-items: center; border-radius: 999px; background: var(--fundo); border: 1px solid var(--borda); }
-.tarefa select { padding: 7px 28px 7px 12px; font-size: 13px; border-radius: 999px; }
-.tarefa span[aria-hidden] { right: 12px; font-size: 12px; }
 .enviar { margin-left: auto; flex: none; border-radius: 999px; transition: transform .15s; }
-.tarefa:not([hidden]) + .enviar { margin-left: 0; }
 .enviar img { display: none; }
 body[data-modo="Explicar"] .enviar img[data-modo="Explicar"], body[data-modo="Ensinar"] .enviar img[data-modo="Ensinar"],
-body[data-modo="Demonstrar"] .enviar img[data-modo="Demonstrar"], body[data-modo="Verificar"] .enviar img[data-modo="Verificar"] { display: block; }
+body[data-modo="Demonstrar"] .enviar img[data-modo="Demonstrar"] { display: block; }
 .enviar:disabled { opacity: .35; cursor: default; }
 .enviar.pronto { animation: chama 2s ease-in-out infinite; }
 .aviso-geral { font-size: 12px; color: #6b6c74; }
@@ -252,7 +237,5 @@ body[data-modo="Demonstrar"] .enviar img[data-modo="Demonstrar"], body[data-modo
   .modos { flex-basis: 100%; }
   .modos button { flex: 1 1 auto; padding: 12px 6px; font-size: 13px; }
   .linha { gap: 8px; }
-  .tarefa { order: 3; margin-left: 0; flex-basis: 100%; }
-  .tarefa:not([hidden]) + .enviar { margin-left: auto; }
   .cena-extra { display: none; }
 }

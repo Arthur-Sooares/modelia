@@ -1,4 +1,6 @@
-"""Orquestrador do Modelia: os modos Explicar, Ensinar, Demonstrar e Verificar (RF4 a RF7).
+"""Orquestrador do Modelia: os modos Explicar, Ensinar e Demonstrar (RF4 a RF6).
+
+O modo Verificar foi retirado a pedido do orientador (29/10/2026).
 
 No Ensinar a LLM nunca fala direto com o Blender. Quando ela pede para executar código, o agente
 guarda o pedido como "pendente" e devolve o controle à interface, que mostra o código
@@ -24,10 +26,9 @@ from dataclasses import dataclass, field
 
 from modelia import config, llm, pecas, receitas
 from modelia.blender import AJUDANTES, FERRAMENTA_EXECUTAR, FERRAMENTAS_LEITURA
-from modelia.tarefas import TAREFAS
 
-EXPLICAR, ENSINAR, DEMONSTRAR, VERIFICAR = "Explicar", "Ensinar", "Demonstrar", "Verificar"
-MODOS = [EXPLICAR, ENSINAR, DEMONSTRAR, VERIFICAR]
+EXPLICAR, ENSINAR, DEMONSTRAR = "Explicar", "Ensinar", "Demonstrar"
+MODOS = [EXPLICAR, ENSINAR, DEMONSTRAR]
 
 NAO_SEI = "NAO_SEI"  # a LLM responde isto quando o material não cobre a dúvida
 
@@ -189,25 +190,6 @@ SISTEMA_DEMONSTRAR = BASE + (
     "Se o Modelia apontar um problema, mande o código completo do objeto de novo, já corrigido."
 )
 
-SISTEMA_VERIFICAR = BASE + (
-    " O aluno fez uma tarefa sozinho no Blender e quer saber se está certa. Você recebe a meta, a medição "
-    "da cena e a correção automática. Dê um feedback encorajador em três partes: o que está certo, o que falta "
-    "e UMA dica do próximo passo. Não dê a solução completa nem código. Você pode usar as ferramentas de "
-    "leitura para ver detalhes de um objeto, mas nunca altera a cena.\n"
-    "O exemplo abaixo só mostra o formato. Use sempre a meta e a correção que vêm na mensagem.\n"
-    "Exemplo:\n"
-    "Meta da tarefa: Crie um cilindro de 1 m de altura apoiado no chão.\n"
-    "Correção automática: nota 2/3.\n"
-    "Certo: [\"Cilindro 'Cylinder' com 1 m de altura.\"]\n"
-    "Falta: ['A base do cilindro está em z = -0.5; ela deve ficar no chão (z = 0).']\n"
-    "Pergunta do aluno: está certo?\n"
-    "Resposta:\n"
-    "**O que está certo:** você criou o cilindro com 1 m de altura. Muito bem!\n"
-    "**O que falta:** ele está metade enterrado. A base está em z = -0,5 e deveria estar no chão (z = 0).\n"
-    "**Dica:** selecione o cilindro e mova no eixo Z (G, depois Z). Quanto ele precisa subir para a base "
-    "encostar no chão?"
-)
-
 PALAVRAS_PROXIMO = {"proximo", "proxima", "continuar", "continue", "segue", "sim", "ok", "pode", "vai"}
 PALAVRAS_PARAR = {"parar", "pare", "chega", "encerrar", "sair"}
 # Resposta à pergunta "apago a cena antes de começar?"; vale a primeira palavra ("sim, pode apagar").
@@ -229,7 +211,6 @@ class Resposta:
     texto: str
     codigo: str = ""               # preenchido quando há código esperando confirmação
     atualizar_cena: bool = False   # a interface deve pedir uma nova captura da cena
-    detalhes: dict | None = None   # Verificar: {"tarefa", "nota", "certo", "falta"} para o cartão de resultado
     problema: str = ""             # "blender_fechado": o chat mostra o passo a passo para abrir o Blender
 
 
@@ -318,7 +299,7 @@ class Agente:
     # --- entrada principal ---
 
     @na_fila
-    def responder(self, estado, mensagem, tarefa_id=""):
+    def responder(self, estado, mensagem):
         mensagem = (mensagem or "").strip()
         if not mensagem:
             return Resposta("Escreva uma mensagem.")
@@ -330,16 +311,14 @@ class Agente:
             aviso = "*O código anterior não foi executado.*\n\n"
         self._abrir_interacao(estado, mensagem)
         if aviso:
-            resposta = self._responder_no_modo(estado, mensagem, tarefa_id)
+            resposta = self._responder_no_modo(estado, mensagem)
             resposta.texto = aviso + resposta.texto
             return resposta
-        return self._responder_no_modo(estado, mensagem, tarefa_id)
+        return self._responder_no_modo(estado, mensagem)
 
-    def _responder_no_modo(self, estado, mensagem, tarefa_id):
+    def _responder_no_modo(self, estado, mensagem):
         if estado.modo == EXPLICAR:
             return self._explicar(estado, mensagem)
-        if estado.modo == VERIFICAR:
-            return self._verificar(estado, mensagem, tarefa_id)
         if estado.modo == DEMONSTRAR:
             return self._demonstrar(estado, mensagem)
         return self._ensinar(estado, mensagem)
@@ -408,52 +387,6 @@ class Agente:
                  "com outras palavras, por exemplo usando o nome da ferramenta do Blender.")
         self._anotar(estado, texto)
         return Resposta(texto)
-
-    # --- RF7: Verificar ---
-
-    def _verificar(self, estado, pergunta, tarefa_id):
-        tarefa = TAREFAS.get(tarefa_id)
-        if not tarefa:
-            texto = "Escolha a tarefa-meta antes de pedir a verificação."
-            self._anotar(estado, texto)
-            return Resposta(texto)
-        try:
-            cena = self.blender.medir_cena()
-        except Exception as erro:
-            texto = str(erro)
-            self._anotar(estado, texto, tarefa=tarefa.id)
-            return Resposta(texto, problema=BLENDER_FECHADO if isinstance(erro, ConnectionError) else "")
-        if not cena["malhas"]:
-            texto = ("Sua cena ainda não tem nenhum objeto de malha. Comece a tarefa "
-                     f"**{tarefa.nome}** no Blender, ou use **Me ensina passo a passo** para ver como se faz.")
-            self._anotar(estado, texto, tarefa=tarefa.id)
-            return Resposta(texto, atualizar_cena=True)
-
-        nota, certo, falta = tarefa.verificar(cena)
-        estado.mensagens = [
-            {"role": "system", "content": SISTEMA_VERIFICAR},
-            {"role": "user", "content": (
-                f"Meta da tarefa: {tarefa.pedido}\n\n"
-                f"Medição da cena (metros): {json.dumps(cena, ensure_ascii=False)}\n\n"
-                f"Correção automática: nota {nota}/3.\nCerto: {certo}\nFalta: {falta}\n\n"
-                f"Pergunta do aluno: {pergunta}")},
-        ]
-        # Só ferramentas de leitura (RF7): o trabalho do aluno não pode ser alterado.
-        texto = self._laco_leitura(estado, self.blender.ferramentas(FERRAMENTAS_LEITURA))
-        self._anotar(estado, texto, tarefa=tarefa.id)
-        detalhes = {"tarefa": tarefa.nome, "nota": nota, "certo": certo, "falta": falta}
-        return Resposta(texto, atualizar_cena=True, detalhes=detalhes)
-
-    def _laco_leitura(self, estado, ferramentas):
-        """Deixa a LLM usar ferramentas de leitura até ela responder com texto."""
-        for _ in range(config.MAX_RODADAS):
-            mensagem = self._falar(estado, ferramentas).message
-            estado.mensagens.append(mensagem)
-            if not mensagem.tool_calls:
-                return (mensagem.content or "").strip()
-            for chamada in mensagem.tool_calls:
-                self._responder_ferramenta_leitura(estado, chamada)
-        return "Não consegui terminar a análise. Tente perguntar de novo."
 
     def _responder_ferramenta_leitura(self, estado, chamada):
         nome = chamada.function.name
